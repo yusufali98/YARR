@@ -6,7 +6,7 @@ try:
 except (ModuleNotFoundError, ImportError) as e:
     print("You need to install RLBench: 'https://github.com/stepjam/RLBench'")
     raise e
-from rlbench.action_modes import ActionMode
+from rlbench.action_modes.action_mode import ActionMode
 from rlbench.backend.observation import Observation
 from rlbench.backend.task import Task
 
@@ -20,10 +20,18 @@ ROBOT_STATE_KEYS = ['joint_velocities', 'joint_positions', 'joint_forces',
                         'gripper_joint_positions', 'gripper_touch_forces',
                         'task_low_dim_state', 'misc']
 
+def _get_low_dim_data(obs: Observation):
+    return np.array([
+        obs.gripper_open,
+        *obs.gripper_joint_positions,
+        *obs.gripper_touch_forces,
+    ])
+
 def _extract_obs(obs: Observation, channels_last: bool, observation_config):
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
-    robot_state = obs.get_low_dim_data()
+    #robot_state = obs.get_low_dim_data()
+    robot_state = _get_low_dim_data(obs)
     # Remove all of the individual state elements
     obs_dict = {k: v for k, v in obs_dict.items()
                 if k not in ROBOT_STATE_KEYS}

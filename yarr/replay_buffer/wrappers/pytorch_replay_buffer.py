@@ -1,6 +1,9 @@
 import time
 from threading import Lock, Thread
 
+import os
+import torch
+import torch.distributed as dist
 from torch.utils.data import IterableDataset, DataLoader
 
 from yarr.replay_buffer.replay_buffer import ReplayBuffer
@@ -72,8 +75,17 @@ class PyTorchReplayBuffer(WrappedReplayBuffer):
         super(PyTorchReplayBuffer, self).__init__(replay_buffer)
         self._num_workers = num_workers
 
+        # os.environ['MASTER_ADDR'] = 'localhost'
+        # os.environ['MASTER_PORT'] = '12355'
+
+        # dist.init_process_group('gloo', rank=0, world_size=torch.cuda.device_count())
+
     def dataset(self) -> DataLoader:
         # d = PyTorchIterableReplayDataset(self._replay_buffer, self._num_workers)
         d = PyTorchIterableReplayDataset(self._replay_buffer)
+
+        # distributed = torch.cuda.device_count() > 1
+        # sampler = torch.utils.data.DistributedSampler(d) if distributed else None
+
         # Batch size None disables automatic batching
         return DataLoader(d, batch_size=None, pin_memory=True)
