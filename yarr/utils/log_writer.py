@@ -6,7 +6,7 @@ from collections import OrderedDict
 import numpy as np
 import torch
 from yarr.agents.agent import ScalarSummary, HistogramSummary, ImageSummary, \
-    VideoSummary
+    VideoSummary, TextSummary
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -55,6 +55,8 @@ class LogWriter(object):
                              np.array([summary.value]))
                         self._tf_writer.add_video(
                             summary.name, v, i, fps=summary.fps)
+                    elif isinstance(summary, TextSummary):
+                        self._tf_writer.add_text(summary.name, summary.value, i)
             except Exception as e:
                 logging.error('Error on summary: %s' % summary.name)
                 raise e
