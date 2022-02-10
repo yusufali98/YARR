@@ -20,6 +20,7 @@ from yarr.runners.env_runner import EnvRunner
 from yarr.runners.train_runner import TrainRunner
 from yarr.utils.log_writer import LogWriter
 from yarr.utils.stat_accumulator import StatAccumulator
+from yarr.replay_buffer.prioritized_replay_buffer import PrioritizedReplayBuffer
 
 NUM_WEIGHTS_TO_KEEP = 10
 
@@ -111,7 +112,8 @@ class PyTorchTrainRunner(TrainRunner):
                 else:
                     # legacy version
                     priority_ = priority[acc_bs: acc_bs + bs]
-                wb.replay_buffer.set_priority(indices_, priority_)
+                if isinstance(wb.replay_buffer, PrioritizedReplayBuffer):
+                    wb.replay_buffer.set_priority(indices_, priority_)
             acc_bs += bs
 
     def _signal_handler(self, sig, frame):
