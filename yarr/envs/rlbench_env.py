@@ -10,6 +10,8 @@ from rlbench.action_modes.action_mode import ActionMode
 from rlbench.backend.observation import Observation
 from rlbench.backend.task import Task
 
+from arm.clip.core.clip import tokenize
+
 from yarr.envs.env import Env, MultiTaskEnv
 from yarr.utils.observation_type import ObservationElement
 from yarr.utils.transition import Transition
@@ -126,18 +128,24 @@ class RLBenchEnv(Env):
                  action_mode: ActionMode,
                  dataset_root: str = '',
                  channels_last=False,
-                 headless=True):
+                 headless=True,
+                 include_lang_goal_in_obs=False):
         super(RLBenchEnv, self).__init__()
         self._task_class = task_class
         self._observation_config = observation_config
         self._channels_last = channels_last
+        self._include_lang_goal_in_obs = include_lang_goal_in_obs
         self._rlbench_env = Environment(
             action_mode=action_mode, obs_config=observation_config,
             dataset_root=dataset_root, headless=headless)
         self._task = None
+        self._lang_goal = 'done.'
 
     def extract_obs(self, obs: Observation):
-        return _extract_obs(obs, self._channels_last, self._observation_config)
+        extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
+        if self._include_lang_goal_in_obs:
+            extracted_obs['lang_goal_tokens'] = tokenize([self._lang_goal])[0].numpy()
+        return extracted_obs
 
     def launch(self):
         self._rlbench_env.launch()
@@ -148,7 +156,9 @@ class RLBenchEnv(Env):
 
     def reset(self) -> dict:
         descriptions, obs = self._task.reset()
-        return self.extract_obs(obs)
+        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
+        extracted_obs = self.extract_obs(obs)
+        return extracted_obs
 
     def step(self, action: np.ndarray) -> Transition:
         obs, reward, terminal = self._task.step(action)

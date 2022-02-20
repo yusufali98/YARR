@@ -28,7 +28,10 @@ class EnvRunner(object):
                  train_replay_buffer: Union[ReplayBuffer, List[ReplayBuffer]],
                  num_train_envs: int,
                  num_eval_envs: int,
-                 episodes: int,
+                 train_episodes: int,
+                 eval_episodes: int,
+                 training_iterations: int,
+                 eval_from_seed: int,
                  episode_length: int,
                  eval_env: Union[Env, None] = None,
                  eval_replay_buffer: Union[ReplayBuffer, List[ReplayBuffer], None] = None,
@@ -47,7 +50,10 @@ class EnvRunner(object):
         if eval_replay_buffer is not None:
             eval_replay_buffer = eval_replay_buffer if isinstance(eval_replay_buffer, list) else [eval_replay_buffer]
         self._eval_replay_buffer = eval_replay_buffer
-        self._episodes = episodes
+        self._train_episodes = train_episodes
+        self._eval_episodes = eval_episodes
+        self._training_iterations = training_iterations
+        self._eval_from_seed = eval_from_seed
         self._episode_length = episode_length
         self._stat_accumulator = stat_accumulator
         self._rollout_generator = (
@@ -113,7 +119,8 @@ class EnvRunner(object):
     def _run(self, save_load_lock):
         self._internal_env_runner = _EnvRunner(
             self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
-            self._eval_envs, self._episodes, self._episode_length, self._kill_signal,
+            self._eval_envs, self._train_episodes, self._eval_episodes,
+            self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
             self._step_signal, self._rollout_generator, save_load_lock,
             self.current_replay_ratio, self.target_replay_ratio,
             self._weightsdir, self._env_device)

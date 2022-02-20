@@ -28,7 +28,10 @@ class _EnvRunner(object):
                  timesteps: int,
                  train_envs: int,
                  eval_envs: int,
-                 episodes: int,
+                 train_episodes: int,
+                 eval_episodes: int,
+                 training_iterations: int,
+                 eval_from_seed: int,
                  episode_length: int,
                  kill_signal: Any,
                  step_signal: Any,
@@ -44,7 +47,10 @@ class _EnvRunner(object):
         self._agent = agent
         self._train_envs = train_envs
         self._eval_envs = eval_envs
-        self._episodes = episodes
+        self._train_episodes = train_episodes
+        self._eval_episodes = eval_episodes
+        self._training_iterations = training_iterations
+        self._eval_from_seed = eval_from_seed
         self._episode_length = episode_length
         self._rollout_generator = rollout_generator
         self._weightsdir = weightsdir
@@ -66,7 +72,8 @@ class _EnvRunner(object):
         self._target_replay_ratio = target_replay_ratio
 
     def restart_process(self, name: str):
-        p = Process(target=self._run_env, args=self._p_args[name], name=name)
+        run_fn = self._run_eval if eval else self._run_train
+        p = Process(target=run_fn, args=self._p_args[name], name=name)
         p.start()
         return p
 
@@ -77,7 +84,8 @@ class _EnvRunner(object):
             n = name + str(i)
             self._p_args[n] = (n, eval)
             self.p_failures[n] = 0
-            p = Process(target=self._run_env, args=self._p_args[n], name=n)
+            run_fn = self._run_eval if eval else self._run_train
+            p = Process(target=run_fn, args=self._p_args[n], name=n)
             p.start()
             ps.append(p)
         return ps
@@ -104,6 +112,7 @@ class _EnvRunner(object):
                             time.sleep(1)
                             self._agent.load_weights(d)
                         logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
+                        print('Agent %s: Loaded weights: %s' % (self._name, d))
                     break
             logging.info('Waiting for weights to become available.')
             time.sleep(1)
@@ -113,7 +122,7 @@ class _EnvRunner(object):
             return np.float32
         return x.dtype
 
-    def _run_env(self, name: str, eval: bool):
+    def _run_train(self, name: str, eval: bool):
 
         self._name = name
 
@@ -128,13 +137,11 @@ class _EnvRunner(object):
         logging.info(self._agent)
 
         env = self._train_env
-        if eval:
-            env = self._eval_env
         env.eval = eval
         env.launch()
-        for ep in range(self._episodes):
+        for ep in range(self._train_episodes):
             self._load_save()
-            logging.debug('%s: Starting episode %d.' % (name, ep))
+            logging.info('%s: Starting episode %d.' % (name, ep))
             episode_rollout = []
             generator = self._rollout_generator.generator(
                 self._step_signal, env, self._agent,
@@ -172,6 +179,84 @@ class _EnvRunner(object):
                 for transition in episode_rollout:
                     self.stored_transitions.append((name, transition, eval))
         env.shutdown()
+
+    def _run_eval(self, name: str, eval: bool):
+
+        self._name = name
+
+        self._agent = copy.deepcopy(self._agent)
+
+        self._agent.build(training=False, device=self._env_device)
+
+        logging.info('%s: Launching env.' % name)
+        np.random.seed()
+
+        logging.info('Agent information:')
+        logging.info(self._agent)
+
+        env = self._eval_env
+        env.eval = eval
+        env.launch()
+
+        while self._unevaluated_weights():
+            self._load_save()
+            for ep in range(self._eval_episodes):
+                eval_demo_seed = ep + self._eval_from_seed
+                logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
+                print("%s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+                episode_rollout = []
+                generator = self._rollout_generator.generator(
+                    self._step_signal, env, self._agent,
+                    self._episode_length, self._timesteps, eval,
+                    eval_demo_seed=eval_demo_seed)
+                try:
+                    for replay_transition in generator:
+                        while True:
+                            if self._kill_signal.value:
+                                env.shutdown()
+                                return
+                            if (eval or self._target_replay_ratio is None or
+                                    self._step_signal.value <= 0 or (
+                                            self._current_replay_ratio.value >
+                                            self._target_replay_ratio)):
+                                break
+                            time.sleep(1)
+                            logging.debug(
+                                'Agent. Waiting for replay_ratio %f to be more than %f' %
+                                (self._current_replay_ratio.value, self._target_replay_ratio))
+
+                        with self.write_lock:
+                            if len(self.agent_summaries) == 0:
+                                # Only store new summaries if the previous ones
+                                # have been popped by the main env runner.
+                                for s in self._agent.act_summaries():
+                                    self.agent_summaries.append(s)
+                        episode_rollout.append(replay_transition)
+                except StopIteration as e:
+                    continue
+                except Exception as e:
+                    env.shutdown()
+                    raise e
+
+                with self.write_lock:
+                    for transition in episode_rollout:
+                        self.stored_transitions.append((name, transition, eval))
+        env.shutdown()
+
+    def _unevaluated_weights(self):
+        weight_folders = []
+
+        while not len(weight_folders) > 1:
+            weight_folders = os.listdir(self._weightsdir)
+            weight_folders = sorted(map(int, weight_folders))
+
+            logging.info('Waiting for first checkpoint.')
+            time.sleep(10)
+
+        if self._previous_loaded_weight_folder == weight_folders[-1] and int(weight_folders[-1]) == self._training_iterations:
+            return False
+
+        return True
 
     def kill(self):
         self._kill_signal.value = True

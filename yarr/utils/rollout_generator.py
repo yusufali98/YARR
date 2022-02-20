@@ -15,8 +15,14 @@ class RolloutGenerator(object):
         return x.dtype
 
     def generator(self, step_signal: Value, env: Env, agent: Agent,
-                  episode_length: int, timesteps: int, eval: bool):
-        obs = env.reset()
+                  episode_length: int, timesteps: int, eval: bool,
+                  eval_demo_seed: int = 0):
+
+        if eval:
+            obs = env.reset_to_demo(eval_demo_seed)
+        else:
+            obs = env.reset()
+
         agent.reset()
         obs_history = {k: [np.array(v, dtype=self._get_type(v))] * timesteps for k, v in obs.items()}
         for step in range(episode_length):

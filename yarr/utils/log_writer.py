@@ -64,7 +64,8 @@ class LogWriter(object):
     def end_iteration(self):
         if self._csv_logging and len(self._row_data) > 0:
             with open(self._csv_file, mode='a+') as csv_f:
-                names = self._field_names or self._row_data.keys()
+                # names = self._field_names or self._row_data.keys()
+                names = self._row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
                 if self._field_names is None:
                     writer.writeheader()
@@ -77,7 +78,10 @@ class LogWriter(object):
                         for mk in missing_keys:
                             self._row_data[mk] = self._prev_row_data[mk]
                 self._field_names = names
-                writer.writerow(self._row_data)
+                try:
+                    writer.writerow(self._row_data)
+                except Exception as e:
+                    print(e)
             self._prev_row_data = self._row_data
             self._row_data = OrderedDict()
 
