@@ -149,6 +149,7 @@ class _EnvRunner(object):
         for ep in range(self._train_episodes):
             self._load_save()
             logging.info('%s: Starting episode %d.' % (name, ep))
+            # print("Train %s: Starting episode %d." % (name, ep))
             episode_rollout = []
             generator = self._rollout_generator.generator(
                 self._step_signal, env, self._agent,
@@ -210,7 +211,7 @@ class _EnvRunner(object):
             for ep in range(self._eval_episodes):
                 eval_demo_seed = ep + self._eval_from_seed
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
-                # print("%s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+                # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
                 episode_rollout = []
                 generator = self._rollout_generator.generator(
                     self._step_signal, env, self._agent,
