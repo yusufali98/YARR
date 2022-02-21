@@ -35,12 +35,16 @@ class _EnvRunner(object):
                  episode_length: int,
                  kill_signal: Any,
                  step_signal: Any,
+                 num_eval_episodes_signal: Any,
+                 eval_report_signal: Any,
+                 log_freq: int,
                  rollout_generator: RolloutGenerator,
                  save_load_lock,
                  current_replay_ratio,
                  target_replay_ratio,
                  weightsdir: str = None,
-                 env_device: torch.device = None
+                 env_device: torch.device = None,
+                 previous_loaded_weight_folder: str = '',
                  ):
         self._train_env = train_env
         self._eval_env = eval_env
@@ -55,7 +59,7 @@ class _EnvRunner(object):
         self._rollout_generator = rollout_generator
         self._weightsdir = weightsdir
         self._env_device = env_device
-        self._previous_loaded_weight_folder = ''
+        self._previous_loaded_weight_folder = previous_loaded_weight_folder
 
         self._timesteps = timesteps
 
@@ -67,9 +71,12 @@ class _EnvRunner(object):
         self.agent_summaries = manager.list()
         self._kill_signal = kill_signal
         self._step_signal = step_signal
+        self._num_eval_episodes_signal = num_eval_episodes_signal
+        self._eval_report_signal = eval_report_signal
         self._save_load_lock = save_load_lock
         self._current_replay_ratio = current_replay_ratio
         self._target_replay_ratio = target_replay_ratio
+        self._log_freq = log_freq
 
     def restart_process(self, name: str):
         run_fn = self._run_eval if eval else self._run_train
@@ -112,7 +119,7 @@ class _EnvRunner(object):
                             time.sleep(1)
                             self._agent.load_weights(d)
                         logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
-                        print('Agent %s: Loaded weights: %s' % (self._name, d))
+                        # print('Agent %s: Loaded weights: %s' % (self._name, d))
                     break
             logging.info('Waiting for weights to become available.')
             time.sleep(1)
@@ -203,7 +210,7 @@ class _EnvRunner(object):
             for ep in range(self._eval_episodes):
                 eval_demo_seed = ep + self._eval_from_seed
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
-                print("%s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+                # print("%s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
                 episode_rollout = []
                 generator = self._rollout_generator.generator(
                     self._step_signal, env, self._agent,
@@ -241,6 +248,9 @@ class _EnvRunner(object):
                 with self.write_lock:
                     for transition in episode_rollout:
                         self.stored_transitions.append((name, transition, eval))
+
+                self._num_eval_episodes_signal.value += 1
+            self._eval_report_signal.value = True
         env.shutdown()
 
     def _unevaluated_weights(self):

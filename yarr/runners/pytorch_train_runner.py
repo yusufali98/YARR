@@ -36,6 +36,8 @@ class PyTorchTrainRunner(TrainRunner):
                  replay_buffer_sample_rates: List[float] = None,
                  stat_accumulator: Union[StatAccumulator, None] = None,
                  iterations: int = int(1e6),
+                 num_train_envs: int = 1,
+                 eval_episodes: int = 10,
                  logdir: str = '/tmp/yarr/logs',
                  log_freq: int = 10,
                  transitions_before_train: int = 1000,
@@ -69,6 +71,8 @@ class PyTorchTrainRunner(TrainRunner):
         self._train_device = train_device
         self._tensorboard_logging = tensorboard_logging
         self._csv_logging = csv_logging
+        self._num_train_envs = num_train_envs
+        self._eval_episodes = eval_episodes
 
         if replay_ratio is not None and replay_ratio < 0:
             raise ValueError("max_replay_ratio must be positive.")
@@ -166,7 +170,11 @@ class PyTorchTrainRunner(TrainRunner):
         for i in range(self._iterations):
             self._env_runner.set_step(i)
 
-            log_iteration = i % self._log_freq == 0 and i > 0
+            if self._num_train_envs > 0:
+                log_iteration = i % self._log_freq == 0 and i > 0
+            else:
+                num_eval_episodes = self._env_runner._num_eval_episodes_signal.value
+                log_iteration = self._env_runner._eval_report_signal.value and num_eval_episodes % self._eval_episodes == 0 and num_eval_episodes > 0
 
             if log_iteration:
                 process.cpu_percent(interval=None)
@@ -215,7 +223,10 @@ class PyTorchTrainRunner(TrainRunner):
                              i, sample_time, step_time, replay_ratio))
                 agent_summaries = self._agent.update_summaries()
                 env_summaries = self._env_runner.summaries()
-                self._writer.add_summaries(i, agent_summaries + env_summaries)
+
+                # self._writer.add_summaries(i, agent_summaries + env_summaries)
+                self._writer.add_summaries(i, agent_summaries)
+                self._writer.add_summaries(self._env_runner._num_eval_episodes_signal.value, env_summaries)
 
                 for r_i, wrapped_buffer in enumerate(self._wrapped_buffer):
                     self._writer.add_scalar(
@@ -247,6 +258,8 @@ class PyTorchTrainRunner(TrainRunner):
                 self._writer.add_scalar(
                     i, 'monitoring/cpu_percent',
                     process.cpu_percent(interval=None) / num_cpu)
+
+                self._env_runner.set_eval_report(False)
 
             self._writer.end_iteration()
 

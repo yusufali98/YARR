@@ -39,6 +39,7 @@ class RolloutGenerator(object):
                                      act_result.replay_elements.items()}
 
             transition = env.step(act_result)
+
             obs_tp1 = dict(transition.observation)
             timeout = False
             if step == episode_length - 1:
@@ -81,4 +82,5 @@ class RolloutGenerator(object):
             yield replay_transition
 
             if transition.info.get("needs_reset", transition.terminal):
+                # print(f"Reward: {transition.reward}")
                 return

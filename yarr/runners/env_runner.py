@@ -67,6 +67,8 @@ class EnvRunner(object):
         self._p = None
         self._kill_signal = Value('b', 0)
         self._step_signal = Value('i', -1)
+        self._num_eval_episodes_signal = Value('i', 0)
+        self._eval_report_signal = Value('b', 0)
         self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
         self._total_transitions = {'train_envs': 0, 'eval_envs': 0}
         self.log_freq = 1000  # Will get overridden later
@@ -91,7 +93,9 @@ class EnvRunner(object):
         with self._internal_env_runner.write_lock:
             self._agent_summaries = list(
                 self._internal_env_runner.agent_summaries)
-            if self._step_signal.value % self.log_freq == 0 and self._step_signal.value > 0:
+            # if self._step_signal.value % self.log_freq == 0 and self._step_signal.value > 0:
+            #     self._internal_env_runner.agent_summaries[:] = []
+            if self._num_eval_episodes_signal.value % self._eval_episodes == 0 and self._num_eval_episodes_signal.value > 0:
                 self._internal_env_runner.agent_summaries[:] = []
             for name, transition, eval in self._internal_env_runner.stored_transitions:
                 add_to_buffer = (not eval) or self._eval_replay_buffer is not None
@@ -121,9 +125,10 @@ class EnvRunner(object):
             self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
             self._eval_envs, self._train_episodes, self._eval_episodes,
             self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
-            self._step_signal, self._rollout_generator, save_load_lock,
+            self._step_signal, self._num_eval_episodes_signal, self._eval_report_signal, self.log_freq,
+            self._rollout_generator, save_load_lock,
             self.current_replay_ratio, self.target_replay_ratio,
-            self._weightsdir, self._env_device)
+            self._weightsdir, self._env_device, self._previous_loaded_weight_folder)
         training_envs = self._internal_env_runner.spin_up_envs('train_env', self._train_envs, False)
         eval_envs = self._internal_env_runner.spin_up_envs('eval_env', self._eval_envs, True)
         envs = training_envs + eval_envs
@@ -179,3 +184,6 @@ class EnvRunner(object):
 
     def set_step(self, step):
         self._step_signal.value = step
+
+    def set_eval_report(self, report):
+        self._eval_report_signal.value = report
