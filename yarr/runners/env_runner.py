@@ -39,6 +39,7 @@ class EnvRunner(object):
                  rollout_generator: RolloutGenerator = None,
                  weightsdir: str = None,
                  max_fails: int = 10,
+                 num_eval_runs: int = 1,
                  env_device: torch.device = None):
         self._train_env = train_env
         self._eval_env = eval_env if eval_env else train_env
@@ -52,6 +53,7 @@ class EnvRunner(object):
         self._eval_replay_buffer = eval_replay_buffer
         self._train_episodes = train_episodes
         self._eval_episodes = eval_episodes
+        self._num_eval_runs = num_eval_runs
         self._training_iterations = training_iterations
         self._eval_from_seed = eval_from_seed
         self._episode_length = episode_length
@@ -128,7 +130,8 @@ class EnvRunner(object):
             self._step_signal, self._num_eval_episodes_signal, self._eval_report_signal, self.log_freq,
             self._rollout_generator, save_load_lock,
             self.current_replay_ratio, self.target_replay_ratio,
-            self._weightsdir, self._env_device, self._previous_loaded_weight_folder)
+            self._weightsdir, self._env_device, self._previous_loaded_weight_folder,
+            num_eval_runs=self._num_eval_runs)
         training_envs = self._internal_env_runner.spin_up_envs('train_env', self._train_envs, False)
         eval_envs = self._internal_env_runner.spin_up_envs('eval_env', self._eval_envs, True)
         envs = training_envs + eval_envs

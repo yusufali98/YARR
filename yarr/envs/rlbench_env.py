@@ -188,26 +188,36 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
                  dataset_root: str = '',
                  channels_last=False,
                  headless=True,
-                 swap_task_every: int = 1):
+                 swap_task_every: int = 1,
+                 include_lang_goal_in_obs=False):
         super(MultiTaskRLBenchEnv, self).__init__()
         self._task_classes = task_classes
         self._observation_config = observation_config
         self._channels_last = channels_last
+        self._include_lang_goal_in_obs = include_lang_goal_in_obs
         self._rlbench_env = Environment(
             action_mode=action_mode, obs_config=observation_config,
             dataset_root=dataset_root, headless=headless)
         self._task = None
+        self._lang_goal = 'done.'
         self._swap_task_every = swap_task_every
         self._rlbench_env
         self._episodes_this_task = 0
+        self._active_task_id = -1
 
-    def _set_new_task(self):
-        self._active_task_id = np.random.randint(0, len(self._task_classes))
+    def _set_new_task(self, shuffle=False):
+        if shuffle:
+            self._active_task_id = np.random.randint(0, len(self._task_classes))
+        else:
+            self._active_task_id = (self._active_task_id + 1) % len(self._task_classes)
         task = self._task_classes[self._active_task_id]
         self._task = self._rlbench_env.get_task(task)
 
     def extract_obs(self, obs: Observation):
-        return _extract_obs(obs, self._channels_last, self._observation_config)
+        extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
+        if self._include_lang_goal_in_obs:
+            extracted_obs['lang_goal_tokens'] = tokenize([self._lang_goal])[0].numpy()
+        return extracted_obs
 
     def launch(self):
         self._rlbench_env.launch()
@@ -223,7 +233,10 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
             self._episodes_this_task = 0
 
         descriptions, obs = self._task.reset()
-        return self.extract_obs(obs)
+        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
+        extracted_obs = self.extract_obs(obs)
+
+        return extracted_obs
 
     def step(self, action: np.ndarray) -> Transition:
         obs, reward, terminal = self._task.step(action)

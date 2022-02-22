@@ -45,6 +45,7 @@ class _EnvRunner(object):
                  weightsdir: str = None,
                  env_device: torch.device = None,
                  previous_loaded_weight_folder: str = '',
+                 num_eval_runs: int = 1,
                  ):
         self._train_env = train_env
         self._eval_env = eval_env
@@ -54,6 +55,7 @@ class _EnvRunner(object):
         self._train_episodes = train_episodes
         self._eval_episodes = eval_episodes
         self._training_iterations = training_iterations
+        self._num_eval_runs = num_eval_runs
         self._eval_from_seed = eval_from_seed
         self._episode_length = episode_length
         self._rollout_generator = rollout_generator
@@ -208,49 +210,50 @@ class _EnvRunner(object):
 
         while self._unevaluated_weights():
             self._load_save()
-            for ep in range(self._eval_episodes):
-                eval_demo_seed = ep + self._eval_from_seed
-                logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
-                # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
-                episode_rollout = []
-                generator = self._rollout_generator.generator(
-                    self._step_signal, env, self._agent,
-                    self._episode_length, self._timesteps, eval,
-                    eval_demo_seed=eval_demo_seed)
-                try:
-                    for replay_transition in generator:
-                        while True:
-                            if self._kill_signal.value:
-                                env.shutdown()
-                                return
-                            if (eval or self._target_replay_ratio is None or
-                                    self._step_signal.value <= 0 or (
-                                            self._current_replay_ratio.value >
-                                            self._target_replay_ratio)):
-                                break
-                            time.sleep(1)
-                            logging.debug(
-                                'Agent. Waiting for replay_ratio %f to be more than %f' %
-                                (self._current_replay_ratio.value, self._target_replay_ratio))
+            for n_eval in range(self._num_eval_runs):
+                for ep in range(self._eval_episodes):
+                    eval_demo_seed = ep + self._eval_from_seed
+                    logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
+                    # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+                    episode_rollout = []
+                    generator = self._rollout_generator.generator(
+                        self._step_signal, env, self._agent,
+                        self._episode_length, self._timesteps, eval,
+                        eval_demo_seed=eval_demo_seed)
+                    try:
+                        for replay_transition in generator:
+                            while True:
+                                if self._kill_signal.value:
+                                    env.shutdown()
+                                    return
+                                if (eval or self._target_replay_ratio is None or
+                                        self._step_signal.value <= 0 or (
+                                                self._current_replay_ratio.value >
+                                                self._target_replay_ratio)):
+                                    break
+                                time.sleep(1)
+                                logging.debug(
+                                    'Agent. Waiting for replay_ratio %f to be more than %f' %
+                                    (self._current_replay_ratio.value, self._target_replay_ratio))
 
-                        with self.write_lock:
-                            if len(self.agent_summaries) == 0:
-                                # Only store new summaries if the previous ones
-                                # have been popped by the main env runner.
-                                for s in self._agent.act_summaries():
-                                    self.agent_summaries.append(s)
-                        episode_rollout.append(replay_transition)
-                except StopIteration as e:
-                    continue
-                except Exception as e:
-                    env.shutdown()
-                    raise e
+                            with self.write_lock:
+                                if len(self.agent_summaries) == 0:
+                                    # Only store new summaries if the previous ones
+                                    # have been popped by the main env runner.
+                                    for s in self._agent.act_summaries():
+                                        self.agent_summaries.append(s)
+                            episode_rollout.append(replay_transition)
+                    except StopIteration as e:
+                        continue
+                    except Exception as e:
+                        env.shutdown()
+                        raise e
 
-                with self.write_lock:
-                    for transition in episode_rollout:
-                        self.stored_transitions.append((name, transition, eval))
+                    with self.write_lock:
+                        for transition in episode_rollout:
+                            self.stored_transitions.append((name, transition, eval))
 
-                self._num_eval_episodes_signal.value += 1
+                    self._num_eval_episodes_signal.value += 1
             self._eval_report_signal.value = True
         env.shutdown()
 
