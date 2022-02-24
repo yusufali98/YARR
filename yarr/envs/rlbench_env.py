@@ -177,6 +177,10 @@ class RLBenchEnv(Env):
     def env(self) -> Environment:
         return self._rlbench_env
 
+    @property
+    def task_name(self) -> str:
+        return self._task.__name__
+
 
 
 class MultiTaskRLBenchEnv(MultiTaskEnv):
@@ -258,3 +262,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
     @property
     def num_tasks(self) -> int:
         return len(self._task_classes)
+
+    @property
+    def task_name(self) -> str:
+        return self._task.__name__

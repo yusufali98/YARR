@@ -18,6 +18,7 @@ from yarr.replay_buffer.replay_buffer import ReplayBuffer
 from yarr.runners._env_runner import _EnvRunner
 from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.stat_accumulator import StatAccumulator
+from yarr.utils.process_str import change_case
 
 
 class EnvRunner(object):
@@ -87,6 +88,13 @@ class EnvRunner(object):
             summaries.append(ScalarSummary('%s/total_transitions' % key, value))
         self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
         summaries.extend(self._agent_summaries)
+
+        # add current task_name to eval summaries
+        eval_task_name = change_case(self._eval_env._task_class.__name__)
+        for s in summaries:
+            if 'eval' in s.name:
+                s.name = '%s/%s' % (eval_task_name, s.name)
+
         return summaries
 
     def _update(self):
