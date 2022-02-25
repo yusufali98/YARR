@@ -177,11 +177,6 @@ class RLBenchEnv(Env):
     def env(self) -> Environment:
         return self._rlbench_env
 
-    @property
-    def task_name(self) -> str:
-        return self._task.__name__
-
-
 
 class MultiTaskRLBenchEnv(MultiTaskEnv):
 
@@ -203,6 +198,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
             action_mode=action_mode, obs_config=observation_config,
             dataset_root=dataset_root, headless=headless)
         self._task = None
+        self._task_name = ''
         self._lang_goal = 'done.'
         self._swap_task_every = swap_task_every
         self._rlbench_env
@@ -262,7 +258,3 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
     @property
     def num_tasks(self) -> int:
         return len(self._task_classes)
-
-    @property
-    def task_name(self) -> str:
-        return self._task.__name__

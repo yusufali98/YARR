@@ -257,7 +257,7 @@ class _EnvRunner(object):
                             self.stored_transitions.append((name, transition, eval))
 
                     self._num_eval_episodes_signal.value += 1
-            self._eval_report_signal.value = True
+                self._eval_report_signal.value = True
         env.shutdown()
 
     def _unevaluated_weights(self):

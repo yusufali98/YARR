@@ -77,6 +77,7 @@ class EnvRunner(object):
         self.log_freq = 1000  # Will get overridden later
         self.target_replay_ratio = None  # Will get overridden later
         self.current_replay_ratio = Value('f', -1)
+        self._current_task_id = -1
 
     def summaries(self) -> List[Summary]:
         summaries = []
@@ -90,10 +91,21 @@ class EnvRunner(object):
         summaries.extend(self._agent_summaries)
 
         # add current task_name to eval summaries
-        eval_task_name = change_case(self._eval_env._task_class.__name__)
-        for s in summaries:
-            if 'eval' in s.name:
-                s.name = '%s/%s' % (eval_task_name, s.name)
+        if hasattr(self._eval_env, '_task_class'):
+            eval_task_name = change_case(self._eval_env._task_class.__name__)
+        elif hasattr(self._eval_env, '_task_classes'):
+            if self._current_task_id != -1:
+                task_id = (self._current_task_id - 1) % len(self._eval_env._task_classes)
+                eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
+            else:
+                eval_task_name = ''
+        else:
+            raise Exception('Neither task_class nor task_classes found in eval env')
+
+        if eval_task_name:
+            for s in summaries:
+                if 'eval' in s.name:
+                    s.name = '%s/%s' % (eval_task_name, s.name)
 
         return summaries
 
@@ -127,6 +139,11 @@ class EnvRunner(object):
                     'eval_envs' if eval else 'train_envs'] += 1
                 if self._stat_accumulator is not None:
                     self._stat_accumulator.step(transition, eval)
+
+                if eval:
+                    self._current_task_id = transition.info["active_task_id"]
+                else:
+                    self._current_task_id = -1
             self._internal_env_runner.stored_transitions[:] = []  # Clear list
         return new_transitions
 

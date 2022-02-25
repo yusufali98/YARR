@@ -174,7 +174,7 @@ class PyTorchTrainRunner(TrainRunner):
                 log_iteration = i % self._log_freq == 0 and i > 0
             else:
                 num_eval_episodes = self._env_runner._num_eval_episodes_signal.value
-                log_iteration = self._env_runner._eval_report_signal.value and num_eval_episodes % self._eval_episodes == 0 and num_eval_episodes > 0
+                log_iteration = self._env_runner._eval_report_signal.value and num_eval_episodes > 0
 
             if log_iteration:
                 process.cpu_percent(interval=None)
