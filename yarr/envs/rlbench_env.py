@@ -15,6 +15,7 @@ from arm.clip.core.clip import tokenize
 from yarr.envs.env import Env, MultiTaskEnv
 from yarr.utils.observation_type import ObservationElement
 from yarr.utils.transition import Transition
+from yarr.utils.process_str import change_case
 
 
 ROBOT_STATE_KEYS = ['joint_velocities', 'joint_positions', 'joint_forces',
@@ -205,6 +206,8 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._episodes_this_task = 0
         self._active_task_id = -1
 
+        self._task_name_to_idx = {change_case(tc.__name__):i for i, tc in enumerate(self._task_classes)}
+
     def _set_new_task(self, shuffle=False):
         if shuffle:
             self._active_task_id = np.random.randint(0, len(self._task_classes))
@@ -212,6 +215,14 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
             self._active_task_id = (self._active_task_id + 1) % len(self._task_classes)
         task = self._task_classes[self._active_task_id]
         self._task = self._rlbench_env.get_task(task)
+
+    def set_task(self, task_name: str):
+        self._active_task_id = self._task_name_to_idx[task_name]
+        task = self._task_classes[self._active_task_id]
+        self._task = self._rlbench_env.get_task(task)
+
+        descriptions = self._task.get_task_descriptions()
+        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
 
     def extract_obs(self, obs: Observation):
         extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
