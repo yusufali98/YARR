@@ -184,7 +184,7 @@ class EnvRunner(object):
                         no_transitions[p.name] += 1
                     else:
                         no_transitions[p.name] = 0
-                    if no_transitions[p.name] > 600:  # 5min
+                    if no_transitions[p.name] > 1200: #600:  # 5min
                         logging.warning("Env %s hangs, so restarting" % p.name)
                         envs.remove(p)
                         os.kill(p.pid, signal.SIGTERM)

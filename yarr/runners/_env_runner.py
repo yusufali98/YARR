@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import time
+
 from multiprocessing import Process, Manager
 from multiprocessing import get_start_method, set_start_method
 from typing import Any
@@ -110,11 +111,11 @@ class _EnvRunner(object):
                     weight_folders = os.listdir(self._weightsdir)
                 if len(weight_folders) > 0:
                     weight_folders = sorted(map(int, weight_folders))
-                    if self._previous_loaded_weight_folder == weight_folders[-1]:
-                        time.sleep(1)
-                        continue
+                    # if self._previous_loaded_weight_folder == weight_folders[-1]:
+                    #     time.sleep(1)
+                    #     continue
                     # Only load if there has been a new weight saving
-                    elif self._previous_loaded_weight_folder != weight_folders[-1]:
+                    if self._previous_loaded_weight_folder != weight_folders[-1]:
                         self._previous_loaded_weight_folder = weight_folders[-1]
                         d = os.path.join(self._weightsdir, str(weight_folders[-1]))
                         try:
@@ -125,7 +126,7 @@ class _EnvRunner(object):
                             self._agent.load_weights(d)
                         logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
                         # print('Agent %s: Loaded weights: %s' % (self._name, d))
-                        break
+                    break
             logging.info('Waiting for weights to become available.')
             time.sleep(1)
 

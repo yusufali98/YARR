@@ -221,7 +221,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         task = self._task_classes[self._active_task_id]
         self._task = self._rlbench_env.get_task(task)
 
-        descriptions = self._task.get_task_descriptions()
+        descriptions, _ = self._task.reset()
         self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
 
     def extract_obs(self, obs: Observation):
