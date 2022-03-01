@@ -238,10 +238,10 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._rlbench_env.shutdown()
 
     def reset(self) -> dict:
-        self._episodes_this_task += 1
         if self._episodes_this_task == self._swap_task_every:
             self._set_new_task()
             self._episodes_this_task = 0
+        self._episodes_this_task += 1
 
         descriptions, obs = self._task.reset()
         self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals

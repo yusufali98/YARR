@@ -95,7 +95,7 @@ class EnvRunner(object):
             eval_task_name = change_case(self._eval_env._task_class.__name__)
         elif hasattr(self._eval_env, '_task_classes'):
             if self._current_task_id != -1:
-                task_id = (self._current_task_id - 1) % len(self._eval_env._task_classes)
+                task_id = (self._current_task_id) % len(self._eval_env._task_classes)
                 eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
             else:
                 eval_task_name = ''
