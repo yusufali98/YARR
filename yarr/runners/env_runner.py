@@ -105,7 +105,7 @@ class EnvRunner(object):
         if eval_task_name:
             for s in summaries:
                 if 'eval' in s.name:
-                    s.name = '%s/%s' % (eval_task_name, s.name)
+                    s.name = '%s/%s' % (s.name, eval_task_name)
 
         return summaries
 
