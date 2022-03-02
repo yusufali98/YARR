@@ -41,7 +41,8 @@ class EnvRunner(object):
                  weightsdir: str = None,
                  max_fails: int = 10,
                  num_eval_runs: int = 1,
-                 env_device: torch.device = None):
+                 env_device: torch.device = None,
+                 multi_task: bool = False):
         self._train_env = train_env
         self._eval_env = eval_env if eval_env else train_env
         self._agent = agent
@@ -78,6 +79,7 @@ class EnvRunner(object):
         self.target_replay_ratio = None  # Will get overridden later
         self.current_replay_ratio = Value('f', -1)
         self._current_task_id = -1
+        self._multi_task = multi_task
 
     def summaries(self) -> List[Summary]:
         summaries = []
@@ -102,7 +104,7 @@ class EnvRunner(object):
         else:
             raise Exception('Neither task_class nor task_classes found in eval env')
 
-        if eval_task_name:
+        if eval_task_name and self._multi_task:
             for s in summaries:
                 if 'eval' in s.name:
                     s.name = '%s/%s' % (s.name, eval_task_name)
