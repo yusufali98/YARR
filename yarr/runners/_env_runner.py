@@ -37,6 +37,7 @@ class _EnvRunner(object):
                  kill_signal: Any,
                  step_signal: Any,
                  num_eval_episodes_signal: Any,
+                 eval_epochs_signal: Any,
                  eval_report_signal: Any,
                  log_freq: int,
                  rollout_generator: RolloutGenerator,
@@ -75,11 +76,14 @@ class _EnvRunner(object):
         self._kill_signal = kill_signal
         self._step_signal = step_signal
         self._num_eval_episodes_signal = num_eval_episodes_signal
+        self._eval_epochs_signal = eval_epochs_signal
         self._eval_report_signal = eval_report_signal
         self._save_load_lock = save_load_lock
         self._current_replay_ratio = current_replay_ratio
         self._target_replay_ratio = target_replay_ratio
         self._log_freq = log_freq
+
+        self._new_weights = False
 
     def restart_process(self, name: str):
         run_fn = self._run_eval if eval else self._run_train
@@ -126,6 +130,9 @@ class _EnvRunner(object):
                             self._agent.load_weights(d)
                         logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
                         # print('Agent %s: Loaded weights: %s' % (self._name, d))
+                        self._new_weights = True
+                    else:
+                        self._new_weights = False
                     break
             logging.info('Waiting for weights to become available.')
             time.sleep(1)
@@ -259,6 +266,10 @@ class _EnvRunner(object):
 
                     self._num_eval_episodes_signal.value += 1
                 self._eval_report_signal.value = True
+
+            if self._new_weights:
+                self._eval_epochs_signal.value += 1
+
         env.shutdown()
 
     def _unevaluated_weights(self):

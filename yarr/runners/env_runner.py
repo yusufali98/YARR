@@ -72,6 +72,7 @@ class EnvRunner(object):
         self._kill_signal = Value('b', 0)
         self._step_signal = Value('i', -1)
         self._num_eval_episodes_signal = Value('i', 0)
+        self._eval_epochs_signal = Value('i', 0)
         self._eval_report_signal = Value('b', 0)
         self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
         self._total_transitions = {'train_envs': 0, 'eval_envs': 0}
@@ -154,8 +155,9 @@ class EnvRunner(object):
             self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
             self._eval_envs, self._train_episodes, self._eval_episodes,
             self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
-            self._step_signal, self._num_eval_episodes_signal, self._eval_report_signal, self.log_freq,
-            self._rollout_generator, save_load_lock,
+            self._step_signal, self._num_eval_episodes_signal,
+            self._eval_epochs_signal, self._eval_report_signal,
+            self.log_freq, self._rollout_generator, save_load_lock,
             self.current_replay_ratio, self.target_replay_ratio,
             self._weightsdir, self._env_device, self._previous_loaded_weight_folder,
             num_eval_runs=self._num_eval_runs)
