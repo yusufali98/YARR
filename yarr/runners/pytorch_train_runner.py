@@ -226,9 +226,9 @@ class PyTorchTrainRunner(TrainRunner):
 
                 # self._writer.add_summaries(i, agent_summaries + env_summaries)
                 self._writer.add_summaries(i, agent_summaries)
-                self._writer.add_summaries(self._env_runner._num_eval_episodes_signal.value,
-                                           env_summaries)
-                # self._writer.add_summaries(self._env_runner._eval_epochs_signal.value, env_summaries)
+                # self._writer.add_summaries(self._env_runner._num_eval_episodes_signal.value,
+                #                            env_summaries)
+                self._writer.add_summaries(self._env_runner._eval_epochs_signal.value, env_summaries)
 
                 for r_i, wrapped_buffer in enumerate(self._wrapped_buffer):
                     self._writer.add_scalar(
