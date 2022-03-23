@@ -28,6 +28,7 @@ class LogWriter(object):
             self._env_csv_file = os.path.join(logdir, 'env_data.csv')
             self._train_field_names = None
             self._env_field_names = None
+            self._resumed_from_prev_run = False
 
     def add_scalar(self, i, name, value):
         if self._tensorboard_logging:
@@ -76,7 +77,7 @@ class LogWriter(object):
                 # names = self._train_field_names or self._train_row_data.keys()
                 names = self._train_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if self._train_field_names is None:
+                if not self._resumed_from_prev_run and self._train_field_names is None:
                     writer.writeheader()
                 else:
                     if not np.array_equal(self._train_field_names, self._train_row_data.keys()):
@@ -99,7 +100,7 @@ class LogWriter(object):
                 # names = self._train_field_names or self._env_row_data.keys()
                 names = self._env_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if self._env_field_names is None:
+                if not _resumed_from_prev_run and self._env_field_names is None:
                     writer.writeheader()
                 else:
                     if not np.array_equal(self._env_field_names, self._env_row_data.keys()):
@@ -116,6 +117,9 @@ class LogWriter(object):
                     print(e)
             self._env_prev_row_data = self._env_row_data
             self._env_row_data = OrderedDict()
+
+    def set_resumed_from_prev_run(self, state):
+        self._resumed_from_prev_run = state
 
     def close(self):
         if self._tensorboard_logging:

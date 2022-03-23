@@ -173,6 +173,7 @@ class PyTorchTrainRunner(TrainRunner):
 
                 eval_epoch = self._get_resume_eval_epoch()
                 self._env_runner.set_eval_epochs(eval_epoch)
+                self._writer.set_resumed_from_prev_run(True)
                 print(f"Resuming evaluation from epoch {eval_epoch} ...")
 
         while (np.any(self._get_add_counts() < self._transitions_before_train)):
@@ -242,8 +243,8 @@ class PyTorchTrainRunner(TrainRunner):
 
             if log_iteration and self._writer is not None:
                 replay_ratio = get_replay_ratio()
-                logging.info('Step %d. Sample time: %s. Step time: %s. Replay ratio: %s.' % (
-                             i, sample_time, step_time, replay_ratio))
+                logging.info('Train Step %d. Eval Epoch %d Sample time: %s. Step time: %s. Replay ratio: %s.' % (
+                    i, self._env_runner._eval_epochs_signal.value, sample_time, step_time, replay_ratio))
                 agent_summaries = self._agent.update_summaries()
                 env_summaries = self._env_runner.summaries()
 
