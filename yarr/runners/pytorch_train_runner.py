@@ -150,7 +150,14 @@ class PyTorchTrainRunner(TrainRunner):
         self._agent.build(training=True, device=self._train_device)
 
         if self._weightsdir is not None:
-            self._save_model(0)  # Save weights so workers can load.
+            existing_weights = sorted([int(f) for f in os.listdir(self._weightsdir)])
+            if len(existing_weights) == 0:
+                self._save_model(0)  # Save weights so workers can load.
+                start_iter = 0
+            else:
+                resume_iteration = existing_weights[-1]
+                self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
+                start_iter = resume_iteration + 1
 
         while (np.any(self._get_add_counts() < self._transitions_before_train)):
             time.sleep(1)
@@ -167,7 +174,7 @@ class PyTorchTrainRunner(TrainRunner):
         process = psutil.Process(os.getpid())
         num_cpu = psutil.cpu_count()
 
-        for i in range(self._iterations):
+        for i in range(start_iter, self._iterations):
             self._env_runner.set_step(i)
 
             if self._num_train_envs > 0:
