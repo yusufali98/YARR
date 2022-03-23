@@ -158,6 +158,7 @@ class PyTorchTrainRunner(TrainRunner):
                 resume_iteration = existing_weights[-1]
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
+                print(f"Resuming training from iteration {resume_iteration} ...")
 
         while (np.any(self._get_add_counts() < self._transitions_before_train)):
             time.sleep(1)
