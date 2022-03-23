@@ -243,7 +243,7 @@ class PyTorchTrainRunner(TrainRunner):
 
             if log_iteration and self._writer is not None:
                 replay_ratio = get_replay_ratio()
-                logging.info('Train Step %d. Eval Epoch %d Sample time: %s. Step time: %s. Replay ratio: %s.' % (
+                logging.info('Train Step %d. Eval Epoch %d. Sample time: %s. Step time: %s. Replay ratio: %s.' % (
                     i, self._env_runner._eval_epochs_signal.value, sample_time, step_time, replay_ratio))
                 agent_summaries = self._agent.update_summaries()
                 env_summaries = self._env_runner.summaries()

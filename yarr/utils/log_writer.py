@@ -100,7 +100,7 @@ class LogWriter(object):
                 # names = self._train_field_names or self._env_row_data.keys()
                 names = self._env_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if not _resumed_from_prev_run and self._env_field_names is None:
+                if not self._resumed_from_prev_run and self._env_field_names is None:
                     writer.writeheader()
                 else:
                     if not np.array_equal(self._env_field_names, self._env_row_data.keys()):
