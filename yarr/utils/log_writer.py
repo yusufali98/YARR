@@ -77,16 +77,17 @@ class LogWriter(object):
                 # names = self._train_field_names or self._train_row_data.keys()
                 names = self._train_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if not self._resumed_from_prev_run and self._train_field_names is None:
-                    writer.writeheader()
-                else:
-                    if not np.array_equal(self._train_field_names, self._train_row_data.keys()):
-                        # Special case when we are logging faster than new
-                        # summaries are coming in.
-                        missing_keys = list(set(self._train_field_names) - set(
-                            self._train_row_data.keys()))
-                        for mk in missing_keys:
-                            self._train_row_data[mk] = self._train_prev_row_data[mk]
+                if not self._resumed_from_prev_run:
+                    if self._train_field_names is None:
+                        writer.writeheader()
+                    else:
+                        if not np.array_equal(self._train_field_names, self._train_row_data.keys()):
+                            # Special case when we are logging faster than new
+                            # summaries are coming in.
+                            missing_keys = list(set(self._train_field_names) - set(
+                                self._train_row_data.keys()))
+                            for mk in missing_keys:
+                                self._train_row_data[mk] = self._train_prev_row_data[mk]
                 self._train_field_names = names
                 try:
                     writer.writerow(self._train_row_data)
@@ -100,16 +101,17 @@ class LogWriter(object):
                 # names = self._train_field_names or self._env_row_data.keys()
                 names = self._env_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if not self._resumed_from_prev_run and self._env_field_names is None:
-                    writer.writeheader()
-                else:
-                    if not np.array_equal(self._env_field_names, self._env_row_data.keys()):
-                        # Special case when we are logging faster than new
-                        # summaries are coming in.
-                        missing_keys = list(set(self._env_field_names) - set(
-                            self._env_row_data.keys()))
-                        for mk in missing_keys:
-                            self._env_row_data[mk] = self._env_prev_row_data[mk]
+                if not self._resumed_from_prev_run:
+                    if self._env_field_names is None:
+                        writer.writeheader()
+                    else:
+                        if not np.array_equal(self._env_field_names, self._env_row_data.keys()):
+                            # Special case when we are logging faster than new
+                            # summaries are coming in.
+                            missing_keys = list(set(self._env_field_names) - set(
+                                self._env_row_data.keys()))
+                            for mk in missing_keys:
+                                self._env_row_data[mk] = self._env_prev_row_data[mk]
                 self._env_field_names = names
                 try:
                     writer.writerow(self._env_row_data)
