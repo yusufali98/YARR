@@ -13,6 +13,7 @@ from typing import Union
 import numpy as np
 import psutil
 import torch
+import pandas as pd
 from yarr.agents.agent import Agent
 from yarr.replay_buffer.wrappers.pytorch_replay_buffer import \
     PyTorchReplayBuffer
@@ -137,6 +138,16 @@ class PyTorchTrainRunner(TrainRunner):
         return sum([
             r.replay_buffer.add_count for r in self._wrapped_buffer])
 
+    def _get_resume_eval_epoch(self):
+        starting_epoch = 0
+        eval_csv_file = self._weightsdir.replace('weights', 'env_data.csv')
+        if os.path.exists(eval_csv_file):
+             eval_dict = pd.read_csv(eval_csv_file).to_dict()
+             epochs = list(eval_dict['step'].values())
+             return epochs[-1] if len(epochs) > 0 else starting_epoch
+        else:
+            return starting_epoch
+
     def start(self):
 
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -159,6 +170,10 @@ class PyTorchTrainRunner(TrainRunner):
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
                 print(f"Resuming training from iteration {resume_iteration} ...")
+
+                eval_epoch = self._get_resume_eval_epoch()
+                self._env_runner.set_eval_epochs(eval_epoch)
+                print(f"Resuming evaluation from epoch {eval_epoch} ...")
 
         while (np.any(self._get_add_counts() < self._transitions_before_train)):
             time.sleep(1)

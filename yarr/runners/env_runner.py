@@ -219,3 +219,7 @@ class EnvRunner(object):
 
     def set_eval_report(self, report):
         self._eval_report_signal.value = report
+
+    def set_eval_epochs(self, epochs):
+        self._eval_epochs_signal.value = epochs
+

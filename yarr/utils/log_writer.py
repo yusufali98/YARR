@@ -22,18 +22,27 @@ class LogWriter(object):
         if tensorboard_logging:
             self._tf_writer = SummaryWriter(logdir)
         if csv_logging:
-            self._prev_row_data = self._row_data = OrderedDict()
-            self._csv_file = os.path.join(logdir, 'data.csv')
-            self._field_names = None
+            self._train_prev_row_data = self._train_row_data = OrderedDict()
+            self._train_csv_file = os.path.join(logdir, 'train_data.csv')
+            self._env_prev_row_data = self._env_row_data = OrderedDict()
+            self._env_csv_file = os.path.join(logdir, 'env_data.csv')
+            self._train_field_names = None
+            self._env_field_names = None
 
     def add_scalar(self, i, name, value):
         if self._tensorboard_logging:
             self._tf_writer.add_scalar(name, value, i)
         if self._csv_logging:
-            if len(self._row_data) == 0:
-                self._row_data['step'] = i
-            self._row_data[name] = value.item() if isinstance(
-                value, torch.Tensor) else value
+            if 'env' in name:
+                if len(self._env_row_data) == 0:
+                    self._env_row_data['step'] = i
+                self._env_row_data[name] = value.item() if isinstance(
+                    value, torch.Tensor) else value
+            else:
+                if len(self._train_row_data) == 0:
+                    self._train_row_data['step'] = i
+                self._train_row_data[name] = value.item() if isinstance(
+                    value, torch.Tensor) else value
 
     def add_summaries(self, i, summaries):
         for summary in summaries:
@@ -62,28 +71,51 @@ class LogWriter(object):
                 raise e
 
     def end_iteration(self):
-        if self._csv_logging and len(self._row_data) > 0:
-            with open(self._csv_file, mode='a+') as csv_f:
-                # names = self._field_names or self._row_data.keys()
-                names = self._row_data.keys()
+        if self._csv_logging and len(self._train_row_data) > 0:
+            with open(self._train_csv_file, mode='a+') as csv_f:
+                # names = self._train_field_names or self._train_row_data.keys()
+                names = self._train_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if self._field_names is None:
+                if self._train_field_names is None:
                     writer.writeheader()
                 else:
-                    if not np.array_equal(self._field_names, self._row_data.keys()):
+                    if not np.array_equal(self._train_field_names, self._train_row_data.keys()):
                         # Special case when we are logging faster than new
                         # summaries are coming in.
-                        missing_keys = list(set(self._field_names) - set(
-                            self._row_data.keys()))
+                        missing_keys = list(set(self._train_field_names) - set(
+                            self._train_row_data.keys()))
                         for mk in missing_keys:
-                            self._row_data[mk] = self._prev_row_data[mk]
-                self._field_names = names
+                            self._train_row_data[mk] = self._train_prev_row_data[mk]
+                self._train_field_names = names
                 try:
-                    writer.writerow(self._row_data)
+                    writer.writerow(self._train_row_data)
                 except Exception as e:
                     print(e)
-            self._prev_row_data = self._row_data
-            self._row_data = OrderedDict()
+            self._train_prev_row_data = self._train_row_data
+            self._train_row_data = OrderedDict()
+
+        if self._csv_logging and len(self._env_row_data) > 0:
+            with open(self._env_csv_file, mode='a+') as csv_f:
+                # names = self._train_field_names or self._env_row_data.keys()
+                names = self._env_row_data.keys()
+                writer = csv.DictWriter(csv_f, fieldnames=names)
+                if self._env_field_names is None:
+                    writer.writeheader()
+                else:
+                    if not np.array_equal(self._env_field_names, self._env_row_data.keys()):
+                        # Special case when we are logging faster than new
+                        # summaries are coming in.
+                        missing_keys = list(set(self._env_field_names) - set(
+                            self._env_row_data.keys()))
+                        for mk in missing_keys:
+                            self._env_row_data[mk] = self._env_prev_row_data[mk]
+                self._env_field_names = names
+                try:
+                    writer.writerow(self._env_row_data)
+                except Exception as e:
+                    print(e)
+            self._env_prev_row_data = self._env_row_data
+            self._env_row_data = OrderedDict()
 
     def close(self):
         if self._tensorboard_logging:
