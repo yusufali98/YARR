@@ -106,7 +106,7 @@ class _EnvRunner(object):
 
     def _load_save(self):
         if self._weightsdir is None:
-            logging.info("'weightsdir' was None, so not loading weights.")
+            print("'weightsdir' was None, so not loading weights.")
             return
         while True:
             weight_folders = []
@@ -128,13 +128,13 @@ class _EnvRunner(object):
                             # Rare case when agent hasn't finished writing.
                             time.sleep(1)
                             self._agent.load_weights(d)
-                        logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
+                        print('Agent %s: Loaded weights: %s' % (self._name, d))
                         # print('Agent %s: Loaded weights: %s' % (self._name, d))
                         self._new_weights = True
                     else:
                         self._new_weights = False
                     break
-            logging.info('Waiting for weights to become available.')
+            print('Waiting for weights to become available.')
             time.sleep(1)
 
     def _get_type(self, x):

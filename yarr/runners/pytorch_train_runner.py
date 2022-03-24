@@ -10,6 +10,7 @@ from multiprocessing import Lock
 from typing import Optional, List
 from typing import Union
 
+import gc
 import numpy as np
 import psutil
 import torch
@@ -286,6 +287,10 @@ class PyTorchTrainRunner(TrainRunner):
                     process.cpu_percent(interval=None) / num_cpu)
 
                 self._env_runner.set_eval_report(False)
+
+                # clean up
+                gc.collect()
+                torch.cuda.empty_cache()
 
             self._writer.end_iteration()
 
