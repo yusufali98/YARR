@@ -24,7 +24,7 @@ from yarr.utils.log_writer import LogWriter
 from yarr.utils.stat_accumulator import StatAccumulator
 from yarr.replay_buffer.prioritized_replay_buffer import PrioritizedReplayBuffer
 
-NUM_WEIGHTS_TO_KEEP = 10
+NUM_WEIGHTS_TO_KEEP = 40
 
 
 class PyTorchTrainRunner(TrainRunner):
