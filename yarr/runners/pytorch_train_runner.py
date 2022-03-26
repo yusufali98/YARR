@@ -39,6 +39,7 @@ class PyTorchTrainRunner(TrainRunner):
                  stat_accumulator: Union[StatAccumulator, None] = None,
                  iterations: int = int(1e6),
                  num_train_envs: int = 1,
+                 num_eval_envs: int = 1,
                  eval_episodes: int = 10,
                  logdir: str = '/tmp/yarr/logs',
                  log_freq: int = 10,
@@ -74,6 +75,7 @@ class PyTorchTrainRunner(TrainRunner):
         self._tensorboard_logging = tensorboard_logging
         self._csv_logging = csv_logging
         self._num_train_envs = num_train_envs
+        self._num_eval_envs = num_eval_envs
         self._eval_episodes = eval_episodes
 
         if replay_ratio is not None and replay_ratio < 0:
@@ -195,7 +197,7 @@ class PyTorchTrainRunner(TrainRunner):
         for i in range(start_iter, self._iterations):
             self._env_runner.set_step(i)
 
-            if self._num_train_envs > 0:
+            if self._num_train_envs > 0 or self._num_eval_envs == 0:
                 log_iteration = i % self._log_freq == 0 and i > 0
             else:
                 num_eval_episodes = self._env_runner._num_eval_episodes_signal.value
