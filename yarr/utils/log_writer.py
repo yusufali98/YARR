@@ -15,7 +15,9 @@ class LogWriter(object):
     def __init__(self,
                  logdir: str,
                  tensorboard_logging: bool,
-                 csv_logging: bool):
+                 csv_logging: bool,
+                 train_csv: str = 'train_data.csv',
+                 env_csv: str = 'env_data.csv'):
         self._tensorboard_logging = tensorboard_logging
         self._csv_logging = csv_logging
         os.makedirs(logdir, exist_ok=True)
@@ -23,9 +25,9 @@ class LogWriter(object):
             self._tf_writer = SummaryWriter(logdir)
         if csv_logging:
             self._train_prev_row_data = self._train_row_data = OrderedDict()
-            self._train_csv_file = os.path.join(logdir, 'train_data.csv')
+            self._train_csv_file = os.path.join(logdir, train_csv)
             self._env_prev_row_data = self._env_row_data = OrderedDict()
-            self._env_csv_file = os.path.join(logdir, 'env_data.csv')
+            self._env_csv_file = os.path.join(logdir, env_csv)
             self._train_field_names = None
             self._env_field_names = None
             self._resumed_from_prev_run = False

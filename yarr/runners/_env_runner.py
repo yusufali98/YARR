@@ -301,13 +301,14 @@ class _EnvRunner(object):
             raise Exception('No weights directory found.')
 
 
-        writer = LogWriter(self._logdir, True, True)
+        writer = LogWriter(self._logdir, True, True,
+                           env_csv='eval_data.csv')
 
         weight_folders = os.listdir(self._weightsdir)
         weight_folders = sorted(map(int, weight_folders))
 
         # check if previous evaluations exist
-        env_data_csv_file = os.path.join(self._logdir, 'env_data.csv')
+        env_data_csv_file = os.path.join(self._logdir, 'eval_data.csv')
         if os.path.exists(env_data_csv_file):
             env_dict = pd.read_csv(env_data_csv_file).to_dict()
             evaluated_weights = sorted(map(int, list(env_dict['step'].values())))
