@@ -300,6 +300,9 @@ class _EnvRunner(object):
         if not os.path.exists(self._weightsdir):
             raise Exception('No weights directory found.')
 
+
+        writer = LogWriter(self._logdir, True, True)
+
         weight_folders = os.listdir(self._weightsdir)
         weight_folders = sorted(map(int, weight_folders))
 
@@ -309,8 +312,7 @@ class _EnvRunner(object):
             env_dict = pd.read_csv(env_data_csv_file).to_dict()
             evaluated_weights = sorted(map(int, list(env_dict['step'].values())))
             weight_folders = [w for w in weight_folders if w not in evaluated_weights]
-
-        writer = LogWriter(self._logdir, True, True)
+            writer.set_resumed_from_prev_run(True)
 
         for weight in weight_folders:
             logging.info('Evaluating weight %s' % weight)
