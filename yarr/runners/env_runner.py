@@ -39,6 +39,7 @@ class EnvRunner(object):
                  stat_accumulator: Union[StatAccumulator, None] = None,
                  rollout_generator: RolloutGenerator = None,
                  weightsdir: str = None,
+                 logdir: str = None,
                  max_fails: int = 10,
                  num_eval_runs: int = 1,
                  env_device: torch.device = None,
@@ -49,7 +50,11 @@ class EnvRunner(object):
         self._train_envs = num_train_envs
         self._eval_envs = num_eval_envs
         self._train_replay_buffer = train_replay_buffer if isinstance(train_replay_buffer, list) else [train_replay_buffer]
-        self._timesteps = self._train_replay_buffer[0].timesteps
+        if self._train_replay_buffer[0] is not None:
+            self._timesteps = self._train_replay_buffer[0].timesteps
+        else:
+            self._timesteps = 1
+
         if eval_replay_buffer is not None:
             eval_replay_buffer = eval_replay_buffer if isinstance(eval_replay_buffer, list) else [eval_replay_buffer]
         self._eval_replay_buffer = eval_replay_buffer
@@ -65,6 +70,7 @@ class EnvRunner(object):
             else rollout_generator)
         self._rollout_generator._env_device = env_device
         self._weightsdir = weightsdir
+        self._logdir = logdir
         self._max_fails = max_fails
         self._env_device = env_device
         self._previous_loaded_weight_folder = ''
@@ -159,7 +165,8 @@ class EnvRunner(object):
             self._eval_epochs_signal, self._eval_report_signal,
             self.log_freq, self._rollout_generator, save_load_lock,
             self.current_replay_ratio, self.target_replay_ratio,
-            self._weightsdir, self._env_device, self._previous_loaded_weight_folder,
+            self._weightsdir, self._logdir,
+            self._env_device, self._previous_loaded_weight_folder,
             num_eval_runs=self._num_eval_runs)
         training_envs = self._internal_env_runner.spin_up_envs('train_env', self._train_envs, False)
         eval_envs = self._internal_env_runner.spin_up_envs('eval_env', self._eval_envs, True)
@@ -204,6 +211,22 @@ class EnvRunner(object):
         self._p = Thread(target=self._run, args=(save_load_lock,), daemon=True)
         self._p.name = 'EnvRunnerThread'
         self._p.start()
+
+    def start_independent(self, save_load_lock):
+        self._internal_env_runner = _EnvRunner(
+            self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
+            self._eval_envs, self._train_episodes, self._eval_episodes,
+            self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
+            self._step_signal, self._num_eval_episodes_signal,
+            self._eval_epochs_signal, self._eval_report_signal,
+            self.log_freq, self._rollout_generator, save_load_lock,
+            self.current_replay_ratio, self.target_replay_ratio,
+            self._weightsdir, self._logdir,
+            self._env_device, self._previous_loaded_weight_folder,
+            num_eval_runs=self._num_eval_runs)
+        self._internal_env_runner._run_eval_independent('eval_env',
+                                                        self._stat_accumulator,
+                                                        True)
 
     def wait(self):
         if self._p.is_alive():

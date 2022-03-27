@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import time
+import pandas as pd
 
 from multiprocessing import Process, Manager
 from multiprocessing import get_start_method, set_start_method
@@ -10,8 +11,12 @@ from typing import Any
 import numpy as np
 import torch
 from yarr.agents.agent import Agent
+from yarr.agents.agent import ScalarSummary
+from yarr.agents.agent import Summary
 from yarr.envs.env import Env
 from yarr.utils.rollout_generator import RolloutGenerator
+from yarr.utils.log_writer import LogWriter
+from yarr.utils.process_str import change_case
 
 try:
     if get_start_method() != 'spawn':
@@ -45,6 +50,7 @@ class _EnvRunner(object):
                  current_replay_ratio,
                  target_replay_ratio,
                  weightsdir: str = None,
+                 logdir: str = None,
                  env_device: torch.device = None,
                  previous_loaded_weight_folder: str = '',
                  num_eval_runs: int = 1,
@@ -62,6 +68,7 @@ class _EnvRunner(object):
         self._episode_length = episode_length
         self._rollout_generator = rollout_generator
         self._weightsdir = weightsdir
+        self._logdir = logdir
         self._env_device = env_device
         self._previous_loaded_weight_folder = previous_loaded_weight_folder
 
@@ -270,6 +277,136 @@ class _EnvRunner(object):
             if self._new_weights:
                 self._eval_epochs_signal.value += 1
 
+        env.shutdown()
+
+    def _run_eval_independent(self, name: str, stats_accumulator, eval=True):
+
+        self._name = name
+
+        self._agent = copy.deepcopy(self._agent)
+
+        self._agent.build(training=False, device=self._env_device)
+
+        logging.info('%s: Launching env.' % name)
+        np.random.seed()
+
+        logging.info('Agent information:')
+        logging.info(self._agent)
+
+        env = self._eval_env
+        env.eval = eval
+        env.launch()
+
+        if not os.path.exists(self._weightsdir):
+            raise Exception('No weights directory found.')
+
+        weight_folders = os.listdir(self._weightsdir)
+        weight_folders = sorted(map(int, weight_folders))
+
+        # check if previous evaluations exist
+        env_data_csv_file = os.path.join(self._logdir, 'env_data.csv')
+        if os.path.exists(env_data_csv_file):
+            env_dict = pd.read_csv(env_data_csv_file).to_dict()
+            evaluated_weights = sorted(map(int, list(env_dict['step'].values())))
+            weight_folders = [w for w in weight_folders if w not in evaluated_weights]
+
+        writer = LogWriter(self._logdir, True, True)
+
+        for weight in weight_folders:
+            logging.info('Evaluating weight %s' % weight)
+            weight_path = os.path.join(self._weightsdir, str(weight))
+            self._agent.load_weights(weight_path)
+
+            new_transitions = {'train_envs': 0, 'eval_envs': 0}
+            total_transitions = {'train_envs': 0, 'eval_envs': 0}
+            current_task_id = -1
+
+            for n_eval in range(self._num_eval_runs):
+                for ep in range(self._eval_episodes):
+                    eval_demo_seed = ep + self._eval_from_seed
+                    logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
+                    # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+                    episode_rollout = []
+                    generator = self._rollout_generator.generator(
+                        self._step_signal, env, self._agent,
+                        self._episode_length, self._timesteps, eval,
+                        eval_demo_seed=eval_demo_seed)
+                    try:
+                        for replay_transition in generator:
+                            while True:
+                                if self._kill_signal.value:
+                                    env.shutdown()
+                                    return
+                                if (eval or self._target_replay_ratio is None or
+                                        self._step_signal.value <= 0 or (
+                                                self._current_replay_ratio.value >
+                                                self._target_replay_ratio)):
+                                    break
+                                time.sleep(1)
+                                logging.debug(
+                                    'Agent. Waiting for replay_ratio %f to be more than %f' %
+                                    (self._current_replay_ratio.value, self._target_replay_ratio))
+
+                            with self.write_lock:
+                                if len(self.agent_summaries) == 0:
+                                    # Only store new summaries if the previous ones
+                                    # have been popped by the main env runner.
+                                    for s in self._agent.act_summaries():
+                                        self.agent_summaries.append(s)
+                            episode_rollout.append(replay_transition)
+                    except StopIteration as e:
+                        continue
+                    except Exception as e:
+                        env.shutdown()
+                        raise e
+
+                    with self.write_lock:
+                        for transition in episode_rollout:
+                            self.stored_transitions.append((name, transition, eval))
+
+                            new_transitions['eval_envs'] += 1
+                            total_transitions['eval_envs'] += 1
+                            stats_accumulator.step(transition, eval)
+                            current_task_id = transition.info['active_task_id']
+
+                    self._num_eval_episodes_signal.value += 1
+
+                # report summaries
+                summaries = []
+                summaries.extend(stats_accumulator.pop())
+                for key, value in new_transitions.items():
+                    summaries.append(ScalarSummary('%s/new_transitions' % key, value))
+                for key, value in total_transitions.items():
+                    summaries.append(ScalarSummary('%s/total_transitions' % key, value))
+                summaries.extend(self.agent_summaries)
+
+                if hasattr(self._eval_env, '_task_class'):
+                    eval_task_name = change_case(self._eval_env._task_class.__name__)
+                    multi_task = False
+                elif hasattr(self._eval_env, '_task_classes'):
+                    if current_task_id != -1:
+                        task_id = (current_task_id) % len(self._eval_env._task_classes)
+                        eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
+                    else:
+                        eval_task_name = ''
+                    multi_task = True
+                else:
+                    raise Exception('Neither task_class nor task_classes found in eval env')
+
+                if eval_task_name and multi_task:
+                    for s in summaries:
+                        if 'eval' in s.name:
+                            s.name = '%s/%s' % (s.name, eval_task_name)
+
+                writer.add_summaries(weight, summaries)
+
+                self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
+                self.agent_summaries[:] = []
+                self.stored_transitions[:] = []
+
+            writer.end_iteration()
+
+        logging.info('Finished evaluation.')
         env.shutdown()
 
     def _unevaluated_weights(self):

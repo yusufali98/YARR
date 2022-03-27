@@ -174,10 +174,11 @@ class PyTorchTrainRunner(TrainRunner):
                 start_iter = resume_iteration + 1
                 print(f"Resuming training from iteration {resume_iteration} ...")
 
-                eval_epoch = self._get_resume_eval_epoch()
-                self._env_runner.set_eval_epochs(eval_epoch)
-                self._writer.set_resumed_from_prev_run(True)
-                print(f"Resuming evaluation from epoch {eval_epoch} ...")
+                if self._num_eval_envs > 0:
+                    eval_epoch = self._get_resume_eval_epoch()
+                    self._env_runner.set_eval_epochs(eval_epoch)
+                    self._writer.set_resumed_from_prev_run(True)
+                    print(f"Resuming evaluation from epoch {eval_epoch} ...")
 
         while (np.any(self._get_add_counts() < self._transitions_before_train)):
             time.sleep(1)
