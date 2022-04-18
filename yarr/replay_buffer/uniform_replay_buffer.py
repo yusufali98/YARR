@@ -6,6 +6,7 @@ i.e. where rewards are accumulated for n steps and the intermediate trajectory
 is not exposed to the agent. This does not allow, for example, performing
 off-policy corrections.
 """
+import ctypes
 import collections
 import concurrent.futures
 import os
@@ -15,6 +16,7 @@ from typing import List, Tuple, Type
 import time
 import math
 # from threading import Lock
+import multiprocessing as mp
 from multiprocessing import Lock
 import numpy as np
 import logging
@@ -172,7 +174,7 @@ class UniformReplayBuffer(ReplayBuffer):
         self._create_storage()
 
         self._lock = Lock()
-        self._add_count = np.array(0)
+        self._add_count = mp.Value('i', 0)
 
         self._replay_capacity = replay_capacity
 
@@ -196,10 +198,10 @@ class UniformReplayBuffer(ReplayBuffer):
     def batch_size(self):
         return self._batch_size
 
-    def _create_storage(self):
+    def _create_storage(self, store=None):
         """Creates the numpy arrays used to store transitions.
         """
-        self._store = {}
+        self._store = {} if store is None else store
         for storage_element in self._storage_signature:
             array_shape = [self._replay_capacity] + list(storage_element.shape)
             if storage_element.name == TERMINAL:
@@ -311,17 +313,27 @@ class UniformReplayBuffer(ReplayBuffer):
             cursor = self.cursor()
 
             if self._disk_saving:
-                self._store[TERMINAL][cursor] = kwargs[TERMINAL]
+
+                term = self._store[TERMINAL]
+                term[cursor] = kwargs[TERMINAL]
+                self._store[TERMINAL] = term
+                # self._store[TERMINAL][cursor] = kwargs[TERMINAL]
+
                 with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:
                     pickle.dump(kwargs, f)
                 # If first add, then pad for correct wrapping
-                if self._add_count == 0:
+                if self._add_count.value == 0:
                     self._add_initial_to_disk(kwargs)
             else:
                 for name, data in kwargs.items():
-                    self._store[name][cursor] = data
 
-            self._add_count += 1
+                    item = self._store[name]
+                    item[cursor] = data
+                    self._store[name] = item
+
+                    # self._store[name][cursor] = data
+            with self._add_count.get_lock():
+                self._add_count.value += 1
             self.invalid_range = invalid_range(
                 self.cursor(), self._replay_capacity, self._timesteps,
                 self._update_horizon)
@@ -398,23 +410,27 @@ class UniformReplayBuffer(ReplayBuffer):
 
     def is_empty(self):
         """Is the Replay Buffer empty?"""
-        return self._add_count == 0
+        return self._add_count.value == 0
 
     def is_full(self):
         """Is the Replay Buffer full?"""
-        return self._add_count >= self._replay_capacity
+        return self._add_count.value >= self._replay_capacity
 
     def cursor(self):
         """Index to the location where the next transition will be written."""
-        return self._add_count % self._replay_capacity
+        return self._add_count.value % self._replay_capacity
 
     @property
     def add_count(self):
-        return self._add_count.copy()
+        return np.array(self._add_count.value) #self._add_count.copy()
 
     @add_count.setter
-    def add_count(self, count: int):
-        self._add_count = np.array(count)
+    def add_count(self, count):
+        if isinstance(count, int):
+            self._add_count = mp.Value('i', count)
+        else:
+            self._add_count = count
+
 
     def get_range(self, array, start_index, end_index):
         """Returns the range of array at the index handling wraparound if necessary.
@@ -498,9 +514,10 @@ class UniformReplayBuffer(ReplayBuffer):
         return state
 
     def get_terminal_stack(self, index):
-        return self.get_range(self._store[TERMINAL],
+        terminal_stack = self.get_range(self._store[TERMINAL],
                               index - self._timesteps + 1,
                               index + 1)
+        return terminal_stack
 
     def is_valid_transition(self, index):
         """Checks if the index contains a valid transition.
