@@ -262,9 +262,9 @@ class UniformReplayBuffer(ReplayBuffer):
         """
 
         # If previous transition was a terminal, then add_final wasn't called
-        if not self.is_empty() and self._store['terminal'][self.cursor() - 1] == 1:
-            raise ValueError('The previous transition was a terminal, '
-                             'but add_final was not called.')
+        # if not self.is_empty() and self._store['terminal'][self.cursor() - 1] == 1:
+        #     raise ValueError('The previous transition was a terminal, '
+        #                      'but add_final was not called.')
 
         kwargs[ACTION] = action
         kwargs[REWARD] = reward
@@ -278,8 +278,8 @@ class UniformReplayBuffer(ReplayBuffer):
         Args:
           **kwargs: The remaining args
         """
-        if self.is_empty() or self._store['terminal'][self.cursor() - 1] != 1:
-            raise ValueError('The previous transition was not terminal.')
+        # if self.is_empty() or self._store['terminal'][self.cursor() - 1] != 1:
+        #     raise ValueError('The previous transition was not terminal.')
         self._check_add_types(kwargs, self._obs_signature)
         transition = self._final_transition(kwargs)
         self._add(transition)
