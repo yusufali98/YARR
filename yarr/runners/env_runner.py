@@ -17,9 +17,9 @@ from yarr.envs.env import Env
 from yarr.replay_buffer.replay_buffer import ReplayBuffer
 from yarr.runners._env_runner import _EnvRunner
 from yarr.utils.rollout_generator import RolloutGenerator
-from yarr.utils.stat_accumulator import StatAccumulator
+from yarr.utils.stat_accumulator import StatAccumulator, SimpleAccumulator
 from yarr.utils.process_str import change_case
-
+from arm.custom_rlbench_env import CustomRLBenchEnv, CustomMultiTaskRLBenchEnv
 
 class EnvRunner(object):
 
@@ -212,21 +212,45 @@ class EnvRunner(object):
         self._p.name = 'EnvRunnerThread'
         self._p.start()
 
-    def start_independent(self, save_load_lock):
+    def start_independent(self, weight,
+                          save_load_lock, writer_lock,
+                          env_config, resumed_from_prev_run):
+        multi_task = isinstance(env_config[0], list)
+        if multi_task:
+            eval_env = CustomMultiTaskRLBenchEnv(
+                task_classes=env_config[0], observation_config=env_config[1],
+                action_mode=env_config[2], dataset_root=env_config[3],
+                episode_length=env_config[4], headless=env_config[5],
+                swap_task_every=env_config[6],
+                include_lang_goal_in_obs=env_config[7],
+                time_in_state=env_config[8], record_every_n=env_config[9])
+        else:
+            eval_env = CustomRLBenchEnv(
+                task_class=env_config[0], observation_config=env_config[1],
+                action_mode=env_config[2], dataset_root=env_config[3],
+                episode_length=env_config[4], headless=env_config[5],
+                include_lang_goal_in_obs=env_config[6],
+                time_in_state=env_config[7], record_every_n=env_config[8])
+
         self._internal_env_runner = _EnvRunner(
-            self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
+            self._train_env, eval_env, self._agent, self._timesteps, self._train_envs,
             self._eval_envs, self._train_episodes, self._eval_episodes,
             self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
             self._step_signal, self._num_eval_episodes_signal,
             self._eval_epochs_signal, self._eval_report_signal,
-            self.log_freq, self._rollout_generator, save_load_lock,
+            self.log_freq, self._rollout_generator, None,
             self.current_replay_ratio, self.target_replay_ratio,
             self._weightsdir, self._logdir,
             self._env_device, self._previous_loaded_weight_folder,
             num_eval_runs=self._num_eval_runs)
+
+        stat_accumulator = SimpleAccumulator(eval_video_fps=30)
         self._internal_env_runner._run_eval_independent('eval_env',
-                                                        self._stat_accumulator,
-                                                        True)
+                                                        stat_accumulator,
+                                                        weight,
+                                                        writer_lock,
+                                                        True,
+                                                        resumed_from_prev_run)
 
     def wait(self):
         if self._p.is_alive():
