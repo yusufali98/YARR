@@ -75,11 +75,12 @@ class LogWriter(object):
 
     def end_iteration(self):
         if self._csv_logging and len(self._train_row_data) > 0:
+            should_write_train_header = not os.path.exists(self._train_csv_file)
             with open(self._train_csv_file, mode='a+') as csv_f:
                 # names = self._train_field_names or self._train_row_data.keys()
                 names = self._train_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if not self._resumed_from_prev_run:
+                if should_write_train_header:
                     if self._train_field_names is None:
                         writer.writeheader()
                     else:
@@ -99,11 +100,12 @@ class LogWriter(object):
             self._train_row_data = OrderedDict()
 
         if self._csv_logging and len(self._env_row_data) > 0:
+            should_write_env_header = not os.path.exists(self._env_csv_file)
             with open(self._env_csv_file, mode='a+') as csv_f:
                 # names = self._train_field_names or self._env_row_data.keys()
                 names = self._env_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
-                if not self._resumed_from_prev_run:
+                if should_write_env_header:
                     if self._env_field_names is None:
                         writer.writeheader()
                     else:
