@@ -284,13 +284,15 @@ class _EnvRunner(object):
                               weight,
                               writer_lock,
                               eval=True,
-                              resumed_from_prev_run=False):
+                              resumed_from_prev_run=False,
+                              device_idx=0):
 
         self._name = name
 
         self._agent = copy.deepcopy(self._agent)
 
-        self._agent.build(training=False, device=self._env_device)
+        device = torch.device('cuda:%d' % device_idx) if torch.cuda.device_count() > 1 else torch.device('cuda:0')
+        self._agent.build(training=False, device=device)
 
         logging.info('%s: Launching env.' % name)
         np.random.seed()

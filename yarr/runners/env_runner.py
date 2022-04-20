@@ -214,7 +214,8 @@ class EnvRunner(object):
 
     def start_independent(self, weight,
                           save_load_lock, writer_lock,
-                          env_config, resumed_from_prev_run):
+                          env_config, resumed_from_prev_run,
+                          device_idx):
         multi_task = isinstance(env_config[0], list)
         if multi_task:
             eval_env = CustomMultiTaskRLBenchEnv(
@@ -250,7 +251,8 @@ class EnvRunner(object):
                                                         weight,
                                                         writer_lock,
                                                         True,
-                                                        resumed_from_prev_run)
+                                                        resumed_from_prev_run,
+                                                        device_idx)
 
     def wait(self):
         if self._p.is_alive():
