@@ -157,7 +157,7 @@ class RLBenchEnv(Env):
 
     def reset(self) -> dict:
         descriptions, obs = self._task.reset()
-        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
         extracted_obs = self.extract_obs(obs)
         return extracted_obs
 
@@ -222,7 +222,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._task = self._rlbench_env.get_task(task)
 
         descriptions, _ = self._task.reset()
-        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
 
     def extract_obs(self, obs: Observation):
         extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
@@ -244,7 +244,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._episodes_this_task += 1
 
         descriptions, obs = self._task.reset()
-        self._lang_goal = np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
         extracted_obs = self.extract_obs(obs)
 
         return extracted_obs
