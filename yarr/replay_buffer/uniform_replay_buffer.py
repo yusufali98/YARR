@@ -313,7 +313,6 @@ class UniformReplayBuffer(ReplayBuffer):
             cursor = self.cursor()
 
             if self._disk_saving:
-
                 term = self._store[TERMINAL]
                 term[cursor] = kwargs[TERMINAL]
                 self._store[TERMINAL] = term
@@ -326,7 +325,6 @@ class UniformReplayBuffer(ReplayBuffer):
                     self._add_initial_to_disk(kwargs)
             else:
                 for name, data in kwargs.items():
-
                     item = self._store[name]
                     item[cursor] = data
                     self._store[name] = item
