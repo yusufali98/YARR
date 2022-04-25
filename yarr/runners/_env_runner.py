@@ -18,6 +18,11 @@ from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.log_writer import LogWriter
 from yarr.utils.process_str import change_case
 
+from pyrep.objects.dummy import Dummy
+from pyrep.objects.vision_sensor import VisionSensor
+from rlbench import Environment
+from rlbench.backend.observation import Observation
+
 try:
     if get_start_method() != 'spawn':
         set_start_method('spawn', force=True)
@@ -279,15 +284,33 @@ class _EnvRunner(object):
 
         env.shutdown()
 
+    def _get_task_name(self):
+        if hasattr(self._eval_env, '_task_class'):
+            eval_task_name = change_case(self._eval_env._task_class.__name__)
+            multi_task = False
+        elif hasattr(self._eval_env, '_task_classes'):
+            if self._eval_env.active_task_id != -1:
+                task_id = (self._eval_env.active_task_id) % len(self._eval_env._task_classes)
+                eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
+            else:
+                eval_task_name = ''
+            multi_task = True
+        else:
+            raise Exception('Neither task_class nor task_classes found in eval env')
+        return eval_task_name, multi_task
+
     def _run_eval_independent(self, name: str,
                               stats_accumulator,
                               weight,
                               writer_lock,
                               eval=True,
                               resumed_from_prev_run=False,
-                              device_idx=0):
+                              device_idx=0,
+                              save_metrics=True,
+                              cinematic_recorder_cfg=None):
 
         self._name = name
+        self._save_metrics = save_metrics
 
         self._agent = copy.deepcopy(self._agent)
 
@@ -304,13 +327,25 @@ class _EnvRunner(object):
         env.eval = eval
         env.launch()
 
+        rec_cfg = cinematic_recorder_cfg
+        if rec_cfg.enabled:
+            cam_placeholder = Dummy('cam_cinematic_placeholder')
+            cam = VisionSensor.create(rec_cfg.camera_resolution)
+            cam.set_pose(cam_placeholder.get_pose())
+            cam.set_parent(cam_placeholder)
+
+            cam_motion = CircleCameraMotion(cam, Dummy('cam_cinematic_base'), rec_cfg.rotate_speed)
+            tr = TaskRecorder(env, cam_motion, fps=rec_cfg.fps)
+
+            env.env._action_mode.arm_action_mode.set_callable_each_step(tr.take_snap)
+
         if not os.path.exists(self._weightsdir):
             raise Exception('No weights directory found.')
 
-
-        writer = LogWriter(self._logdir, True, True,
-                           env_csv='eval_data.csv')
-        writer.set_resumed_from_prev_run(resumed_from_prev_run)
+        if self._save_metrics:
+            writer = LogWriter(self._logdir, True, True,
+                               env_csv='eval_data.csv')
+            writer.set_resumed_from_prev_run(resumed_from_prev_run)
         #
         # weight_folders = os.listdir(self._weightsdir)
         # weight_folders = sorted(map(int, weight_folders))
@@ -325,6 +360,7 @@ class _EnvRunner(object):
 
         logging.info('Evaluating weight %s' % weight)
         weight_path = os.path.join(self._weightsdir, str(weight))
+        seed_path = self._weightsdir.replace('/weights', '')
         self._agent.load_weights(weight_path)
 
         new_transitions = {'train_envs': 0, 'eval_envs': 0}
@@ -333,6 +369,9 @@ class _EnvRunner(object):
 
         for n_eval in range(self._num_eval_runs):
             for ep in range(self._eval_episodes):
+                if rec_cfg.enabled:
+                    tr._cam_motion.save_pose()
+
                 eval_demo_seed = ep + self._eval_from_seed
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
                 # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
@@ -381,6 +420,14 @@ class _EnvRunner(object):
 
                 self._num_eval_episodes_signal.value += 1
 
+                # record
+                if rec_cfg.enabled:
+                    task_name, _ = self._get_task_name()
+                    record_file = os.path.join(seed_path, 'videos',
+                                               '%s_w%s_s%s.avi' % (task_name, weight, eval_demo_seed))
+                    tr.save(record_file)
+                    tr._cam_motion.restore_pose()
+
             # report summaries
             summaries = []
             summaries.extend(stats_accumulator.pop())
@@ -390,18 +437,8 @@ class _EnvRunner(object):
                 summaries.append(ScalarSummary('%s/total_transitions' % key, value))
             summaries.extend(self.agent_summaries)
 
-            if hasattr(self._eval_env, '_task_class'):
-                eval_task_name = change_case(self._eval_env._task_class.__name__)
-                multi_task = False
-            elif hasattr(self._eval_env, '_task_classes'):
-                if current_task_id != -1:
-                    task_id = (current_task_id) % len(self._eval_env._task_classes)
-                    eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
-                else:
-                    eval_task_name = ''
-                multi_task = True
-            else:
-                raise Exception('Neither task_class nor task_classes found in eval env')
+            # get task name
+            eval_task_name, multi_task = self._get_task_name()
 
             if eval_task_name and multi_task:
                 for s in summaries:
@@ -409,15 +446,17 @@ class _EnvRunner(object):
                         s.name = '%s/%s' % (s.name, eval_task_name)
             print("Finished %s." % eval_task_name)
 
-            with writer_lock:
-                writer.add_summaries(weight, summaries)
+            if self._save_metrics:
+                with writer_lock:
+                    writer.add_summaries(weight, summaries)
 
             self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
             self.agent_summaries[:] = []
             self.stored_transitions[:] = []
 
-        with writer_lock:
-            writer.end_iteration()
+        if self._save_metrics:
+            with writer_lock:
+                writer.end_iteration()
 
         logging.info('Finished evaluation.')
         env.shutdown()
@@ -439,3 +478,74 @@ class _EnvRunner(object):
 
     def kill(self):
         self._kill_signal.value = True
+
+
+class CameraMotion(object):
+    def __init__(self, cam: VisionSensor):
+        self.cam = cam
+
+    def step(self):
+        raise NotImplementedError()
+
+    def save_pose(self):
+        self._prev_pose = self.cam.get_pose()
+
+    def restore_pose(self):
+        self.cam.set_pose(self._prev_pose)
+
+
+class CircleCameraMotion(CameraMotion):
+
+    def __init__(self, cam: VisionSensor, origin: Dummy,
+                 speed: float, init_rotation: float = np.deg2rad(180)):
+        super().__init__(cam)
+        self.origin = origin
+        self.speed = speed  # in radians
+        self.origin.rotate([0, 0, init_rotation])
+
+    def step(self):
+        self.origin.rotate([0, 0, self.speed])
+
+
+class TaskRecorder(object):
+
+    def __init__(self, env: Environment, cam_motion: CameraMotion, fps=30):
+        self._env = env
+        self._cam_motion = cam_motion
+        self._fps = fps
+        self._snaps = []
+        self._current_snaps = []
+
+    def take_snap(self, obs: Observation):
+        self._cam_motion.step()
+        self._current_snaps.append(
+            (self._cam_motion.cam.capture_rgb() * 255.).astype(np.uint8))
+
+    # def record_task(self, task: Type[Task]):
+    #     task = self._env.get_task(task)
+    #     self._cam_motion.save_pose()
+    #     while True:
+    #         try:
+    #             task.get_demos(
+    #                 1, live_demos=True, callable_each_step=self.take_snap,
+    #                 max_attempts=1)
+    #             break
+    #         except RuntimeError:
+    #             self._cam_motion.restore_pose()
+    #             self._current_snaps = []
+    #     self._snaps.extend(self._current_snaps)
+    #     self._current_snaps = []
+    #     return True
+
+    def save(self, path):
+        print('Converting to video ...')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        # OpenCV QT version can conflict with PyRep, so import here
+        import cv2
+        video = cv2.VideoWriter(
+                path, cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), self._fps,
+                tuple(self._cam_motion.cam.get_resolution()))
+        for image in self._current_snaps:
+            video.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        video.release()
+        self._current_snaps = []
