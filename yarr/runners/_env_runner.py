@@ -17,11 +17,10 @@ from yarr.envs.env import Env
 from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.log_writer import LogWriter
 from yarr.utils.process_str import change_case
+from yarr.utils.video_utils import CircleCameraMotion, TaskRecorder
 
 from pyrep.objects.dummy import Dummy
 from pyrep.objects.vision_sensor import VisionSensor
-from rlbench import Environment
-from rlbench.backend.observation import Observation
 
 try:
     if get_start_method() != 'spawn':
@@ -368,10 +367,10 @@ class _EnvRunner(object):
         current_task_id = -1
 
         for n_eval in range(self._num_eval_runs):
-            for ep in range(self._eval_episodes):
-                if rec_cfg.enabled:
-                    tr._cam_motion.save_pose()
+            if rec_cfg.enabled:
+                tr._cam_motion.save_pose()
 
+            for ep in range(self._eval_episodes):
                 eval_demo_seed = ep + self._eval_from_seed
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
                 # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
@@ -424,8 +423,12 @@ class _EnvRunner(object):
                 if rec_cfg.enabled:
                     task_name, _ = self._get_task_name()
                     record_file = os.path.join(seed_path, 'videos',
-                                               '%s_w%s_s%s.avi' % (task_name, weight, eval_demo_seed))
-                    tr.save(record_file)
+                                               '%s_w%s_s%s.mp4' % (task_name, weight, eval_demo_seed))
+
+                    lang_goal = self._eval_env._lang_goal
+                    reward = stats_accumulator._eval_acc._get()[0].value
+
+                    tr.save(record_file, lang_goal, reward)
                     tr._cam_motion.restore_pose()
 
             # report summaries
@@ -480,72 +483,3 @@ class _EnvRunner(object):
         self._kill_signal.value = True
 
 
-class CameraMotion(object):
-    def __init__(self, cam: VisionSensor):
-        self.cam = cam
-
-    def step(self):
-        raise NotImplementedError()
-
-    def save_pose(self):
-        self._prev_pose = self.cam.get_pose()
-
-    def restore_pose(self):
-        self.cam.set_pose(self._prev_pose)
-
-
-class CircleCameraMotion(CameraMotion):
-
-    def __init__(self, cam: VisionSensor, origin: Dummy,
-                 speed: float, init_rotation: float = np.deg2rad(180)):
-        super().__init__(cam)
-        self.origin = origin
-        self.speed = speed  # in radians
-        self.origin.rotate([0, 0, init_rotation])
-
-    def step(self):
-        self.origin.rotate([0, 0, self.speed])
-
-
-class TaskRecorder(object):
-
-    def __init__(self, env: Environment, cam_motion: CameraMotion, fps=30):
-        self._env = env
-        self._cam_motion = cam_motion
-        self._fps = fps
-        self._snaps = []
-        self._current_snaps = []
-
-    def take_snap(self, obs: Observation):
-        self._cam_motion.step()
-        self._current_snaps.append(
-            (self._cam_motion.cam.capture_rgb() * 255.).astype(np.uint8))
-
-    # def record_task(self, task: Type[Task]):
-    #     task = self._env.get_task(task)
-    #     self._cam_motion.save_pose()
-    #     while True:
-    #         try:
-    #             task.get_demos(
-    #                 1, live_demos=True, callable_each_step=self.take_snap,
-    #                 max_attempts=1)
-    #             break
-    #         except RuntimeError:
-    #             self._cam_motion.restore_pose()
-    #             self._current_snaps = []
-    #     self._snaps.extend(self._current_snaps)
-    #     self._current_snaps = []
-    #     return True
-
-    def save(self, path):
-        print('Converting to video ...')
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        # OpenCV QT version can conflict with PyRep, so import here
-        import cv2
-        video = cv2.VideoWriter(
-                path, cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), self._fps,
-                tuple(self._cam_motion.cam.get_resolution()))
-        for image in self._current_snaps:
-            video.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-        video.release()
-        self._current_snaps = []
