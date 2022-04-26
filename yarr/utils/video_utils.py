@@ -66,7 +66,7 @@ class TaskRecorder(object):
             lang_textsize = cv2.getTextSize(lang_goal, font, font_scale, font_thickness)[0]
             lang_textX = (image_size[0] - lang_textsize[0]) // 2
 
-            frame = cv2.putText(frame, lang_goal, org=(lang_textX, image_size[1] - 15),
+            frame = cv2.putText(frame, lang_goal, org=(lang_textX, image_size[1] - 35),
                                 fontScale=font_scale, fontFace=font, color=(0, 0, 0),
                                 thickness=font_thickness, lineType=cv2.LINE_AA)
 
