@@ -314,7 +314,8 @@ class _EnvRunner(object):
         self._agent = copy.deepcopy(self._agent)
 
         device = torch.device('cuda:%d' % device_idx) if torch.cuda.device_count() > 1 else torch.device('cuda:0')
-        self._agent.build(training=False, device=device)
+        with writer_lock: # hack to prevent multiple CLIP downloads
+            self._agent.build(training=False, device=device)
 
         logging.info('%s: Launching env.' % name)
         np.random.seed()
