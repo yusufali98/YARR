@@ -48,6 +48,7 @@ def _extract_obs(obs: Observation, channels_last: bool, observation_config):
         obs_dict = {k: v if v.ndim == 3 else np.expand_dims(v, -1)
                     for k, v in obs_dict.items()}
     obs_dict['low_dim_state'] = np.array(robot_state, dtype=np.float32)
+    obs_dict['ignore_collisions'] = np.array([obs.ignore_collisions], dtype=np.float32)
     for (k, v) in [(k, v) for k, v in obs_dict.items() if 'point_cloud' in k]:
         obs_dict[k] = v.astype(np.float32)
 

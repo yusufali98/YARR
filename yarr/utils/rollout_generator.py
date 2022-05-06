@@ -42,7 +42,8 @@ class RolloutGenerator(object):
 
             obs_tp1 = dict(transition.observation)
             timeout = False
-            if step == episode_length - 1:
+            if step == episode_length - \
+                    1:
                 # If last transition, and not terminal, then we timed out
                 timeout = not transition.terminal
                 if timeout:
