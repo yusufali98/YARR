@@ -734,6 +734,13 @@ class UniformReplayBuffer(ReplayBuffer):
         if pack_in_dict:
             batch_arrays = self.unpack_transition(
                 batch_arrays, transition_elements)
+
+        # TODO: make a proper fix for this
+        if 'task' in batch_arrays:
+            del batch_arrays['task']
+        if 'task_tp1' in batch_arrays:
+            del batch_arrays['task_tp1']
+
         return batch_arrays
 
     def get_transition_elements(self, batch_size=None):
