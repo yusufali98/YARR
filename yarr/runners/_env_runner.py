@@ -427,7 +427,7 @@ class _EnvRunner(object):
                                                '%s_w%s_s%s.mp4' % (task_name, weight, eval_demo_seed))
 
                     lang_goal = self._eval_env._lang_goal
-                    reward = stats_accumulator._eval_acc._get()[0].value
+                    reward = episode_rollout[-1].reward
 
                     tr.save(record_file, lang_goal, reward)
                     tr._cam_motion.restore_pose()
