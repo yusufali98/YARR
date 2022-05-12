@@ -49,8 +49,8 @@ class PyTorchTrainRunner(TrainRunner):
                  replay_ratio: Optional[float] = None,
                  tensorboard_logging: bool = True,
                  csv_logging: bool = False,
-                 buffers_per_batch: int = -1  # -1 = all
-                 ):
+                 buffers_per_batch: int = -1,  # -1 = all
+                 load_existing_weights: bool = True):
         super(PyTorchTrainRunner, self).__init__(
             agent, env_runner, wrapped_replay_buffer,
             stat_accumulator,
@@ -77,6 +77,7 @@ class PyTorchTrainRunner(TrainRunner):
         self._num_train_envs = num_train_envs
         self._num_eval_envs = num_eval_envs
         self._eval_episodes = eval_episodes
+        self._load_existing_weights = load_existing_weights
 
         if replay_ratio is not None and replay_ratio < 0:
             raise ValueError("max_replay_ratio must be positive.")
@@ -165,7 +166,7 @@ class PyTorchTrainRunner(TrainRunner):
 
         if self._weightsdir is not None:
             existing_weights = sorted([int(f) for f in os.listdir(self._weightsdir)])
-            if len(existing_weights) == 0:
+            if (not self._load_existing_weights) or len(existing_weights) == 0:
                 self._save_model(0)  # Save weights so workers can load.
                 start_iter = 0
             else:
