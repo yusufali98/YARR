@@ -422,12 +422,16 @@ class _EnvRunner(object):
 
                 # record
                 if rec_cfg.enabled:
+                    reward = episode_rollout[-1].reward
+                    success = reward > 0.99
                     task_name, _ = self._get_task_name()
                     record_file = os.path.join(seed_path, 'videos',
-                                               '%s_w%s_s%s.mp4' % (task_name, weight, eval_demo_seed))
+                                               '%s_w%s_s%s_%s.mp4' % (task_name,
+                                                                      weight,
+                                                                      eval_demo_seed,
+                                                                      'succ' if success else 'fail'))
 
                     lang_goal = self._eval_env._lang_goal
-                    reward = episode_rollout[-1].reward
 
                     tr.save(record_file, lang_goal, reward)
                     tr._cam_motion.restore_pose()
