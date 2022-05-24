@@ -310,6 +310,7 @@ class _EnvRunner(object):
 
         self._name = name
         self._save_metrics = save_metrics
+        self._is_test_set = type(weight) == dict
 
         self._agent = copy.deepcopy(self._agent)
 
@@ -343,8 +344,9 @@ class _EnvRunner(object):
             raise Exception('No weights directory found.')
 
         if self._save_metrics:
+            csv_file = 'eval_data.csv' if not self._is_test_set else 'test_data.csv'
             writer = LogWriter(self._logdir, True, True,
-                               env_csv='eval_data.csv')
+                               env_csv=csv_file)
             writer.set_resumed_from_prev_run(resumed_from_prev_run)
         #
         # weight_folders = os.listdir(self._weightsdir)
