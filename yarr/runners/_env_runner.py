@@ -358,10 +358,12 @@ class _EnvRunner(object):
         #     weight_folders = [w for w in weight_folders if w not in evaluated_weights]
         #     writer.set_resumed_from_prev_run(True)
 
-        logging.info('Evaluating weight %s' % weight)
-        weight_path = os.path.join(self._weightsdir, str(weight))
-        seed_path = self._weightsdir.replace('/weights', '')
-        self._agent.load_weights(weight_path)
+        if type(weight) == int:
+            print('Evaluating weight %s' % weight)
+            weight_path = os.path.join(self._weightsdir, str(weight))
+            seed_path = self._weightsdir.replace('/weights', '')
+            self._agent.load_weights(weight_path)
+            weight_name = str(weight)
 
         new_transitions = {'train_envs': 0, 'eval_envs': 0}
         total_transitions = {'train_envs': 0, 'eval_envs': 0}
@@ -370,6 +372,15 @@ class _EnvRunner(object):
         for n_eval in range(self._num_eval_runs):
             if rec_cfg.enabled:
                 tr._cam_motion.save_pose()
+
+            if type(weight) == dict:
+                task_name = list(weight.keys())[n_eval]
+                task_weight = weight[task_name]
+                weight_path = os.path.join(self._weightsdir, str(task_weight))
+                seed_path = self._weightsdir.replace('/weights', '')
+                self._agent.load_weights(weight_path)
+                weight_name = str(task_weight)
+                print('Evaluating weight %s for %s' % (weight_name, task_name))
 
             for ep in range(self._eval_episodes):
                 eval_demo_seed = ep + self._eval_from_seed
@@ -427,7 +438,7 @@ class _EnvRunner(object):
                     task_name, _ = self._get_task_name()
                     record_file = os.path.join(seed_path, 'videos',
                                                '%s_w%s_s%s_%s.mp4' % (task_name,
-                                                                      weight,
+                                                                      weight_name,
                                                                       eval_demo_seed,
                                                                       'succ' if success else 'fail'))
 
@@ -456,7 +467,7 @@ class _EnvRunner(object):
 
             if self._save_metrics:
                 with writer_lock:
-                    writer.add_summaries(weight, summaries)
+                    writer.add_summaries(weight_name, summaries)
 
             self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
             self.agent_summaries[:] = []
