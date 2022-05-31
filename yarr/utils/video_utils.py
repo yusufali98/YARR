@@ -70,12 +70,12 @@ class TaskRecorder(object):
                                 fontScale=font_scale, fontFace=font, color=(0, 0, 0),
                                 thickness=font_thickness, lineType=cv2.LINE_AA)
 
-            reward_org = (image_size[0] - 118, 25)
-            reward_text = "Score: {}".format(reward)
-
-            frame = cv2.putText(frame, reward_text, org=reward_org,
-                                fontScale=0.6, fontFace=font, color=(0, 0, 255),
-                                thickness=font_thickness, lineType=cv2.LINE_AA)
+            # reward_org = (image_size[0] - 118, 25)
+            # reward_text = "Score: {}".format(reward)
+            #
+            # frame = cv2.putText(frame, reward_text, org=reward_org,
+            #                     fontScale=0.6, fontFace=font, color=(0, 0, 255),
+            #                     thickness=font_thickness, lineType=cv2.LINE_AA)
 
             video.write(frame)
         video.release()
