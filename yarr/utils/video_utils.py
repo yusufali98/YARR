@@ -61,7 +61,7 @@ class TaskRecorder(object):
 
             font = cv2.FONT_HERSHEY_DUPLEX
             font_scale = (0.45 * image_size[0]) / 640
-            font_thickness = 1 # int((0.6 * image_size[0]) / 640)
+            font_thickness = 2 # int((0.6 * image_size[0]) / 640)
 
             lang_textsize = cv2.getTextSize(lang_goal, font, font_scale, font_thickness)[0]
             lang_textX = (image_size[0] - lang_textsize[0]) // 2
