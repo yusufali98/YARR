@@ -80,7 +80,8 @@ class RolloutGenerator(object):
                 replay_transition.final_observation = obs_tp1
 
             if transition.terminal or timeout or step == episode_length - 1:
-                env.env._action_mode.record_end(steps=60, step_scene=True)
+                env.env._action_mode.arm_action_mode.record_end(env.env._scene,
+                                                                steps=60, step_scene=True)
 
             obs = dict(transition.observation)
             yield replay_transition
