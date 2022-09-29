@@ -15,8 +15,9 @@ class RolloutGenerator(object):
         return x.dtype
 
     def generator(self, step_signal: Value, env: Env, agent: Agent,
-                  episode_length: int, timesteps: int, eval: bool,
-                  eval_demo_seed: int = 0):
+                  episode_length: int, timesteps: int,
+                  eval: bool, eval_demo_seed: int = 0,
+                  record_enabled: bool = False):
 
         if eval:
             obs = env.reset_to_demo(eval_demo_seed)
@@ -39,11 +40,9 @@ class RolloutGenerator(object):
                                      act_result.replay_elements.items()}
 
             transition = env.step(act_result)
-
             obs_tp1 = dict(transition.observation)
             timeout = False
-            if step == episode_length - \
-                    1:
+            if step == episode_length - 1:
                 # If last transition, and not terminal, then we timed out
                 timeout = not transition.terminal
                 if timeout:
@@ -79,7 +78,7 @@ class RolloutGenerator(object):
                     obs_tp1.update(agent_obs_elems_tp1)
                 replay_transition.final_observation = obs_tp1
 
-            if transition.terminal or timeout or step == episode_length - 1:
+            if record_enabled and transition.terminal or timeout or step == episode_length - 1:
                 env.env._action_mode.arm_action_mode.record_end(env.env._scene,
                                                                 steps=60, step_scene=True)
 
@@ -87,5 +86,4 @@ class RolloutGenerator(object):
             yield replay_transition
 
             if transition.info.get("needs_reset", transition.terminal):
-                # print(f"Reward: {transition.reward}")
                 return

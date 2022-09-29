@@ -38,7 +38,7 @@ class _EnvRunner(object):
                  timesteps: int,
                  train_envs: int,
                  eval_envs: int,
-                 train_episodes: int,
+                 rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
                  eval_from_seed: int,
@@ -64,7 +64,7 @@ class _EnvRunner(object):
         self._agent = agent
         self._train_envs = train_envs
         self._eval_envs = eval_envs
-        self._train_episodes = train_episodes
+        self._rollout_episodes = rollout_episodes
         self._eval_episodes = eval_episodes
         self._training_iterations = training_iterations
         self._num_eval_runs = num_eval_runs
@@ -97,8 +97,7 @@ class _EnvRunner(object):
         self._new_weights = False
 
     def restart_process(self, name: str):
-        run_fn = self._run_eval if eval else self._run_train
-        p = Process(target=run_fn, args=self._p_args[name], name=name)
+        p = Process(target=self._run_env, args=self._p_args[name], name=name)
         p.start()
         return p
 
@@ -109,15 +108,14 @@ class _EnvRunner(object):
             n = name + str(i)
             self._p_args[n] = (n, eval)
             self.p_failures[n] = 0
-            run_fn = self._run_eval if eval else self._run_train
-            p = Process(target=run_fn, args=self._p_args[n], name=n)
+            p = Process(target=self._run_env, args=self._p_args[n], name=n)
             p.start()
             ps.append(p)
         return ps
 
     def _load_save(self):
         if self._weightsdir is None:
-            print("'weightsdir' was None, so not loading weights.")
+            logging.info("'weightsdir' was None, so not loading weights.")
             return
         while True:
             weight_folders = []
@@ -126,9 +124,6 @@ class _EnvRunner(object):
                     weight_folders = os.listdir(self._weightsdir)
                 if len(weight_folders) > 0:
                     weight_folders = sorted(map(int, weight_folders))
-                    # if self._previous_loaded_weight_folder == weight_folders[-1]:
-                    #     time.sleep(1)
-                    #     continue
                     # Only load if there has been a new weight saving
                     if self._previous_loaded_weight_folder != weight_folders[-1]:
                         self._previous_loaded_weight_folder = weight_folders[-1]
@@ -140,7 +135,6 @@ class _EnvRunner(object):
                             time.sleep(1)
                             self._agent.load_weights(d)
                         print('Agent %s: Loaded weights: %s' % (self._name, d))
-                        # print('Agent %s: Loaded weights: %s' % (self._name, d))
                         self._new_weights = True
                     else:
                         self._new_weights = False
@@ -153,7 +147,22 @@ class _EnvRunner(object):
             return np.float32
         return x.dtype
 
-    def _run_train(self, name: str, eval: bool):
+    def _get_task_name(self):
+        if hasattr(self._eval_env, '_task_class'):
+            eval_task_name = change_case(self._eval_env._task_class.__name__)
+            multi_task = False
+        elif hasattr(self._eval_env, '_task_classes'):
+            if self._eval_env.active_task_id != -1:
+                task_id = (self._eval_env.active_task_id) % len(self._eval_env._task_classes)
+                eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
+            else:
+                eval_task_name = ''
+            multi_task = True
+        else:
+            raise Exception('Neither task_class nor task_classes found in eval env')
+        return eval_task_name, multi_task
+
+    def _run_env(self, name: str, eval: bool):
 
         self._name = name
 
@@ -168,16 +177,19 @@ class _EnvRunner(object):
         logging.info(self._agent)
 
         env = self._train_env
+        if eval:
+            env = self._eval_env
         env.eval = eval
         env.launch()
-        for ep in range(self._train_episodes):
+        for ep in range(self._rollout_episodes):
             self._load_save()
-            logging.info('%s: Starting episode %d.' % (name, ep))
-            # print("Train %s: Starting episode %d." % (name, ep))
+            logging.debug('%s: Starting episode %d.' % (name, ep))
             episode_rollout = []
             generator = self._rollout_generator.generator(
                 self._step_signal, env, self._agent,
-                self._episode_length, self._timesteps, eval)
+                self._episode_length, self._timesteps,
+                eval, eval_demo_seed=eval_demo_seed,
+                record_enabled=rec_cfg.enabled))
             try:
                 for replay_transition in generator:
                     while True:
@@ -212,92 +224,6 @@ class _EnvRunner(object):
                     self.stored_transitions.append((name, transition, eval))
         env.shutdown()
 
-    def _run_eval(self, name: str, eval: bool):
-
-        self._name = name
-
-        self._agent = copy.deepcopy(self._agent)
-
-        self._agent.build(training=False, device=self._env_device)
-
-        logging.info('%s: Launching env.' % name)
-        np.random.seed()
-
-        logging.info('Agent information:')
-        logging.info(self._agent)
-
-        env = self._eval_env
-        env.eval = eval
-        env.launch()
-
-        while self._unevaluated_weights():
-            self._load_save()
-            for n_eval in range(self._num_eval_runs):
-                for ep in range(self._eval_episodes):
-                    eval_demo_seed = ep + self._eval_from_seed
-                    logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
-                    # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
-                    episode_rollout = []
-                    generator = self._rollout_generator.generator(
-                        self._step_signal, env, self._agent,
-                        self._episode_length, self._timesteps, eval,
-                        eval_demo_seed=eval_demo_seed)
-                    try:
-                        for replay_transition in generator:
-                            while True:
-                                if self._kill_signal.value:
-                                    env.shutdown()
-                                    return
-                                if (eval or self._target_replay_ratio is None or
-                                        self._step_signal.value <= 0 or (
-                                                self._current_replay_ratio.value >
-                                                self._target_replay_ratio)):
-                                    break
-                                time.sleep(1)
-                                logging.debug(
-                                    'Agent. Waiting for replay_ratio %f to be more than %f' %
-                                    (self._current_replay_ratio.value, self._target_replay_ratio))
-
-                            with self.write_lock:
-                                if len(self.agent_summaries) == 0:
-                                    # Only store new summaries if the previous ones
-                                    # have been popped by the main env runner.
-                                    for s in self._agent.act_summaries():
-                                        self.agent_summaries.append(s)
-                            episode_rollout.append(replay_transition)
-                    except StopIteration as e:
-                        continue
-                    except Exception as e:
-                        env.shutdown()
-                        raise e
-
-                    with self.write_lock:
-                        for transition in episode_rollout:
-                            self.stored_transitions.append((name, transition, eval))
-
-                    self._num_eval_episodes_signal.value += 1
-                self._eval_report_signal.value = True
-
-            if self._new_weights:
-                self._eval_epochs_signal.value += 1
-
-        env.shutdown()
-
-    def _get_task_name(self):
-        if hasattr(self._eval_env, '_task_class'):
-            eval_task_name = change_case(self._eval_env._task_class.__name__)
-            multi_task = False
-        elif hasattr(self._eval_env, '_task_classes'):
-            if self._eval_env.active_task_id != -1:
-                task_id = (self._eval_env.active_task_id) % len(self._eval_env._task_classes)
-                eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
-            else:
-                eval_task_name = ''
-            multi_task = True
-        else:
-            raise Exception('Neither task_class nor task_classes found in eval env')
-        return eval_task_name, multi_task
-
     def _run_eval_independent(self, name: str,
                               stats_accumulator,
                               weight,
@@ -315,7 +241,7 @@ class _EnvRunner(object):
         self._agent = copy.deepcopy(self._agent)
 
         device = torch.device('cuda:%d' % device_idx) if torch.cuda.device_count() > 1 else torch.device('cuda:0')
-        with writer_lock: # hack to prevent multiple CLIP downloads
+        with writer_lock: # hack to prevent multiple CLIP downloads ... argh
             self._agent.build(training=False, device=device)
 
         logging.info('%s: Launching env.' % name)
@@ -328,6 +254,7 @@ class _EnvRunner(object):
         env.eval = eval
         env.launch()
 
+        # initialize cinematic recorder if specified
         rec_cfg = cinematic_recorder_cfg
         if rec_cfg.enabled:
             cam_placeholder = Dummy('cam_cinematic_placeholder')
@@ -343,23 +270,14 @@ class _EnvRunner(object):
         if not os.path.exists(self._weightsdir):
             raise Exception('No weights directory found.')
 
+        # to save or not to save evaluation metrics (set as False for recording videos)
         if self._save_metrics:
             csv_file = 'eval_data.csv' if not self._is_test_set else 'test_data.csv'
             writer = LogWriter(self._logdir, True, True,
                                env_csv=csv_file)
             writer.set_resumed_from_prev_run(resumed_from_prev_run)
-        #
-        # weight_folders = os.listdir(self._weightsdir)
-        # weight_folders = sorted(map(int, weight_folders))
-        #
-        # # check if previous evaluations exist
-        # env_data_csv_file = os.path.join(self._logdir, 'eval_data.csv')
-        # if os.path.exists(env_data_csv_file):
-        #     env_dict = pd.read_csv(env_data_csv_file).to_dict()
-        #     evaluated_weights = sorted(map(int, list(env_dict['step'].values())))
-        #     weight_folders = [w for w in weight_folders if w not in evaluated_weights]
-        #     writer.set_resumed_from_prev_run(True)
 
+        # one weight for all tasks (used for validation)
         if type(weight) == int:
             print('Evaluating weight %s' % weight)
             weight_path = os.path.join(self._weightsdir, str(weight))
@@ -375,6 +293,7 @@ class _EnvRunner(object):
             if rec_cfg.enabled:
                 tr._cam_motion.save_pose()
 
+            # best weight for each task (used for test evaluation)
             if type(weight) == dict:
                 task_name = list(weight.keys())[n_eval]
                 task_weight = weight[task_name]
@@ -384,15 +303,18 @@ class _EnvRunner(object):
                 weight_name = str(task_weight)
                 print('Evaluating weight %s for %s' % (weight_name, task_name))
 
+            # evaluate on N tasks * M episodes per task = total eval episodes
             for ep in range(self._eval_episodes):
                 eval_demo_seed = ep + self._eval_from_seed
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
-                # print("Eval: %s: Starting episode %d, seed %d." % (name, ep, eval_demo_seed))
+
+                # the current task gets reset after every M episodes
                 episode_rollout = []
                 generator = self._rollout_generator.generator(
                     self._step_signal, env, self._agent,
-                    self._episode_length, self._timesteps, eval,
-                    eval_demo_seed=eval_demo_seed)
+                    self._episode_length, self._timesteps,
+                    eval, eval_demo_seed=eval_demo_seed,
+                    record_enabled=rec_cfg.enabled)
                 try:
                     for replay_transition in generator:
                         while True:
@@ -433,7 +355,7 @@ class _EnvRunner(object):
 
                 self._num_eval_episodes_signal.value += 1
 
-                # record
+                # save recording
                 if rec_cfg.enabled:
                     reward = episode_rollout[-1].reward
                     success = reward > 0.99
@@ -458,7 +380,6 @@ class _EnvRunner(object):
                 summaries.append(ScalarSummary('%s/total_transitions' % key, value))
             summaries.extend(self.agent_summaries)
 
-            # get task name
             eval_task_name, multi_task = self._get_task_name()
 
             if eval_task_name and multi_task:
@@ -499,5 +420,3 @@ class _EnvRunner(object):
 
     def kill(self):
         self._kill_signal.value = True
-
-

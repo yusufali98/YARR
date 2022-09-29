@@ -24,7 +24,7 @@ from yarr.utils.log_writer import LogWriter
 from yarr.utils.stat_accumulator import StatAccumulator
 from yarr.replay_buffer.prioritized_replay_buffer import PrioritizedReplayBuffer
 
-NUM_WEIGHTS_TO_KEEP = 40
+NUM_WEIGHTS_TO_KEEP = 60
 
 
 class PyTorchTrainRunner(TrainRunner):
@@ -144,7 +144,7 @@ class PyTorchTrainRunner(TrainRunner):
 
     def _get_resume_eval_epoch(self):
         starting_epoch = 0
-        eval_csv_file = self._weightsdir.replace('weights', 'env_data.csv')
+        eval_csv_file = self._weightsdir.replace('weights', 'eval_data.csv') # TODO(mohit): check if it's supposed be 'env_data.csv'
         if os.path.exists(eval_csv_file):
              eval_dict = pd.read_csv(eval_csv_file).to_dict()
              epochs = list(eval_dict['step'].values())
@@ -167,7 +167,7 @@ class PyTorchTrainRunner(TrainRunner):
         if self._weightsdir is not None:
             existing_weights = sorted([int(f) for f in os.listdir(self._weightsdir)])
             if (not self._load_existing_weights) or len(existing_weights) == 0:
-                self._save_model(0)  # Save weights so workers can load.
+                self._save_model(0)
                 start_iter = 0
             else:
                 resume_iteration = existing_weights[-1]
@@ -253,10 +253,10 @@ class PyTorchTrainRunner(TrainRunner):
                 agent_summaries = self._agent.update_summaries()
                 env_summaries = self._env_runner.summaries()
 
-                # self._writer.add_summaries(i, agent_summaries + env_summaries)
+                # agent summaries
                 self._writer.add_summaries(i, agent_summaries)
-                # self._writer.add_summaries(self._env_runner._num_eval_episodes_signal.value,
-                #                            env_summaries)
+
+                # env summaries
                 self._writer.add_summaries(self._env_runner._eval_epochs_signal.value, env_summaries)
 
                 for r_i, wrapped_buffer in enumerate(self._wrapped_buffer):
@@ -291,10 +291,6 @@ class PyTorchTrainRunner(TrainRunner):
                     process.cpu_percent(interval=None) / num_cpu)
 
                 self._env_runner.set_eval_report(False)
-
-                # clean up
-                gc.collect()
-                torch.cuda.empty_cache()
 
             self._writer.end_iteration()
 

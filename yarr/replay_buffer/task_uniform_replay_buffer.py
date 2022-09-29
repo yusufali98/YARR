@@ -36,7 +36,6 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                 term = self._store[TERMINAL]
                 term[cursor] = kwargs[TERMINAL]
                 self._store[TERMINAL] = term
-                # self._store[TERMINAL][cursor] = kwargs[TERMINAL]
 
                 with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:
                     pickle.dump(kwargs, f)
@@ -48,8 +47,6 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                     item = self._store[name]
                     item[cursor] = data
                     self._store[name] = item
-
-                    # self._store[name][cursor] = data
             with self._add_count.get_lock():
                 task = kwargs[TASK]
                 if task not in self._task_idxs:
@@ -76,7 +73,6 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
             tries.
         """
         if self.is_full():
-            # add_count >= self._replay_capacity > self._stack_size
             min_id = (self.cursor() - self._replay_capacity +
                       self._timesteps - 1)
             max_id = self.cursor() - self._update_horizon
@@ -92,12 +88,16 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
         tasks = list(self._task_idxs.keys())
         attempt_count = 0
         found_indicies = False
+
+        # uniform distribution of tasks
         while not found_indicies and attempt_count < 1000:
             sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
             potential_indices = []
             for task in sampled_tasks:
                 sampled_task_idx = np.random.choice(self._task_idxs[task], 1)[0]
                 per_task_attempt_count = 0
+
+                # Argh.. this is slow
                 while not self.is_valid_transition(sampled_task_idx) and \
                     per_task_attempt_count < self._max_sample_attempts:
                     sampled_task_idx = np.random.choice(self._task_idxs[task], 1)[0]
@@ -118,15 +118,3 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                     format(self._max_sample_attempts, len(indices), batch_size))
 
         return indices
-
-    # def sample_transition_batch(self, batch_size=None, indices=None,
-    #                             pack_in_dict=True):
-    #     batched_arrays = super(TaskUniformReplayBuffer, self).sample_transition_batch(batch_size, indices, pack_in_dict)
-    #
-    #     # TODO: make a proper fix for this
-    #     if 'task' in batched_arrays:
-    #         del batched_arrays['task']
-    #     if 'task_tp1' in batched_arrays:
-    #         del batched_arrays['task_tp1']
-    #
-    #     return batched_arrays

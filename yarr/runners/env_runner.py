@@ -29,7 +29,7 @@ class EnvRunner(object):
                  train_replay_buffer: Union[ReplayBuffer, List[ReplayBuffer]],
                  num_train_envs: int,
                  num_eval_envs: int,
-                 train_episodes: int,
+                 rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
                  eval_from_seed: int,
@@ -50,15 +50,12 @@ class EnvRunner(object):
         self._train_envs = num_train_envs
         self._eval_envs = num_eval_envs
         self._train_replay_buffer = train_replay_buffer if isinstance(train_replay_buffer, list) else [train_replay_buffer]
-        if self._train_replay_buffer[0] is not None:
-            self._timesteps = self._train_replay_buffer[0].timesteps
-        else:
-            self._timesteps = 1
+        self._timesteps = self._train_replay_buffer[0].timesteps if self._train_replay_buffer[0] is not None else 1
 
         if eval_replay_buffer is not None:
             eval_replay_buffer = eval_replay_buffer if isinstance(eval_replay_buffer, list) else [eval_replay_buffer]
         self._eval_replay_buffer = eval_replay_buffer
-        self._train_episodes = train_episodes
+        self._rollout_episodes = rollout_episodes
         self._eval_episodes = eval_episodes
         self._num_eval_runs = num_eval_runs
         self._training_iterations = training_iterations
@@ -99,7 +96,7 @@ class EnvRunner(object):
         self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
         summaries.extend(self._agent_summaries)
 
-        # add current task_name to eval summaries
+        # add current task_name to eval summaries .... argh this should be inside a helper function
         if hasattr(self._eval_env, '_task_class'):
             eval_task_name = change_case(self._eval_env._task_class.__name__)
         elif hasattr(self._eval_env, '_task_classes'):
@@ -111,6 +108,7 @@ class EnvRunner(object):
         else:
             raise Exception('Neither task_class nor task_classes found in eval env')
 
+        # multi-task summaries
         if eval_task_name and self._multi_task:
             for s in summaries:
                 if 'eval' in s.name:
@@ -124,8 +122,6 @@ class EnvRunner(object):
         with self._internal_env_runner.write_lock:
             self._agent_summaries = list(
                 self._internal_env_runner.agent_summaries)
-            # if self._step_signal.value % self.log_freq == 0 and self._step_signal.value > 0:
-            #     self._internal_env_runner.agent_summaries[:] = []
             if self._num_eval_episodes_signal.value % self._eval_episodes == 0 and self._num_eval_episodes_signal.value > 0:
                 self._internal_env_runner.agent_summaries[:] = []
             for name, transition, eval in self._internal_env_runner.stored_transitions:
@@ -148,18 +144,14 @@ class EnvRunner(object):
                     'eval_envs' if eval else 'train_envs'] += 1
                 if self._stat_accumulator is not None:
                     self._stat_accumulator.step(transition, eval)
-
-                if eval:
-                    self._current_task_id = transition.info["active_task_id"]
-                else:
-                    self._current_task_id = -1
+                self._current_task_id = transition.info["active_task_id"] if eval else -1
             self._internal_env_runner.stored_transitions[:] = []  # Clear list
         return new_transitions
 
     def _run(self, save_load_lock):
         self._internal_env_runner = _EnvRunner(
             self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
-            self._eval_envs, self._train_episodes, self._eval_episodes,
+            self._eval_envs, self._rollout_episodes, self._eval_episodes,
             self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
             self._step_signal, self._num_eval_episodes_signal,
             self._eval_epochs_signal, self._eval_report_signal,
@@ -195,7 +187,7 @@ class EnvRunner(object):
                         no_transitions[p.name] += 1
                     else:
                         no_transitions[p.name] = 0
-                    if no_transitions[p.name] > 1200: #600:  # 5min
+                    if no_transitions[p.name] > 1200: #600:  # 10min
                         logging.warning("Env %s hangs, so restarting" % p.name)
                         envs.remove(p)
                         os.kill(p.pid, signal.SIGTERM)
@@ -212,6 +204,7 @@ class EnvRunner(object):
         self._p.name = 'EnvRunnerThread'
         self._p.start()
 
+    # serialized evaluator for individual tasks
     def start_independent(self, weight,
                           save_load_lock, writer_lock,
                           env_config, resumed_from_prev_run,
@@ -237,7 +230,7 @@ class EnvRunner(object):
 
         self._internal_env_runner = _EnvRunner(
             self._train_env, eval_env, self._agent, self._timesteps, self._train_envs,
-            self._eval_envs, self._train_episodes, self._eval_episodes,
+            self._eval_envs, self._rollout_episodes, self._eval_episodes,
             self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
             self._step_signal, self._num_eval_episodes_signal,
             self._eval_epochs_signal, self._eval_report_signal,

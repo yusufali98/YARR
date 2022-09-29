@@ -30,13 +30,13 @@ class LogWriter(object):
             self._env_csv_file = os.path.join(logdir, env_csv)
             self._train_field_names = None
             self._env_field_names = None
-            self._resumed_from_prev_run = False
+            self._resumed_from_prev_run = False  # argh... not used anywhere
 
     def add_scalar(self, i, name, value):
         if self._tensorboard_logging:
             self._tf_writer.add_scalar(name, value, i)
         if self._csv_logging:
-            if 'env' in name:
+            if 'env' in name or 'eval' in name or 'test' in name:
                 if len(self._env_row_data) == 0:
                     self._env_row_data['step'] = i
                 self._env_row_data[name] = value.item() if isinstance(
@@ -74,10 +74,10 @@ class LogWriter(object):
                 raise e
 
     def end_iteration(self):
+        # write train data
         if self._csv_logging and len(self._train_row_data) > 0:
             should_write_train_header = not os.path.exists(self._train_csv_file)
             with open(self._train_csv_file, mode='a+') as csv_f:
-                # names = self._train_field_names or self._train_row_data.keys()
                 names = self._train_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
                 if should_write_train_header:
@@ -99,10 +99,10 @@ class LogWriter(object):
             self._train_prev_row_data = self._train_row_data
             self._train_row_data = OrderedDict()
 
+        # write env data (also eval or test during evaluation)
         if self._csv_logging and len(self._env_row_data) > 0:
             should_write_env_header = not os.path.exists(self._env_csv_file)
             with open(self._env_csv_file, mode='a+') as csv_f:
-                # names = self._train_field_names or self._env_row_data.keys()
                 names = self._env_row_data.keys()
                 writer = csv.DictWriter(csv_f, fieldnames=names)
                 if should_write_env_header:

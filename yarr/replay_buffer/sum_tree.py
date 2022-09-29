@@ -54,6 +54,7 @@ class SumTree(object):
         Args:
           capacity: int, the maximum number of elements that can be stored in this
             data structure.
+          nodes: storage list for storing nodes
 
         Raises:
           ValueError: If requested capacity is not positive.

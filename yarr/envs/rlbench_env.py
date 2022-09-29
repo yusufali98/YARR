@@ -10,7 +10,7 @@ from rlbench.action_modes.action_mode import ActionMode
 from rlbench.backend.observation import Observation
 from rlbench.backend.task import Task
 
-from arm.clip.core.clip import tokenize
+from clip import tokenize
 
 from yarr.envs.env import Env, MultiTaskEnv
 from yarr.utils.observation_type import ObservationElement
@@ -23,18 +23,10 @@ ROBOT_STATE_KEYS = ['joint_velocities', 'joint_positions', 'joint_forces',
                         'gripper_joint_positions', 'gripper_touch_forces',
                         'task_low_dim_state', 'misc']
 
-def _get_low_dim_data(obs: Observation):
-    return np.array([
-        obs.gripper_open,
-        *obs.gripper_joint_positions,
-        # *obs.gripper_touch_forces,
-    ])
-
 def _extract_obs(obs: Observation, channels_last: bool, observation_config):
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
     robot_state = obs.get_low_dim_data()
-    # robot_state = _get_low_dim_data(obs)
     # Remove all of the individual state elements
     obs_dict = {k: v for k, v in obs_dict.items()
                 if k not in ROBOT_STATE_KEYS}
@@ -141,7 +133,7 @@ class RLBenchEnv(Env):
             action_mode=action_mode, obs_config=observation_config,
             dataset_root=dataset_root, headless=headless)
         self._task = None
-        self._lang_goal = 'done.'
+        self._lang_goal = 'unknown goal'
 
     def extract_obs(self, obs: Observation):
         extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
@@ -158,7 +150,7 @@ class RLBenchEnv(Env):
 
     def reset(self) -> dict:
         descriptions, obs = self._task.reset()
-        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # first description variant
         extracted_obs = self.extract_obs(obs)
         return extracted_obs
 
@@ -201,7 +193,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
             dataset_root=dataset_root, headless=headless)
         self._task = None
         self._task_name = ''
-        self._lang_goal = 'done.'
+        self._lang_goal = 'unknown goal'
         self._swap_task_every = swap_task_every
         self._rlbench_env
         self._episodes_this_task = 0
@@ -223,7 +215,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._task = self._rlbench_env.get_task(task)
 
         descriptions, _ = self._task.reset()
-        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # first description variant
 
     def extract_obs(self, obs: Observation):
         extracted_obs = _extract_obs(obs, self._channels_last, self._observation_config)
@@ -245,7 +237,7 @@ class MultiTaskRLBenchEnv(MultiTaskEnv):
         self._episodes_this_task += 1
 
         descriptions, obs = self._task.reset()
-        self._lang_goal = descriptions[0] # np.random.choice(descriptions) # randomly select from templated goals
+        self._lang_goal = descriptions[0] # first description variant
         extracted_obs = self.extract_obs(obs)
 
         return extracted_obs

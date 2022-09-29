@@ -61,7 +61,7 @@ class TaskRecorder(object):
 
             font = cv2.FONT_HERSHEY_DUPLEX
             font_scale = (0.45 * image_size[0]) / 640
-            font_thickness = 2 # int((0.6 * image_size[0]) / 640)
+            font_thickness = 2
 
             lang_textsize = cv2.getTextSize(lang_goal, font, font_scale, font_thickness)[0]
             lang_textX = (image_size[0] - lang_textsize[0]) // 2
@@ -69,13 +69,6 @@ class TaskRecorder(object):
             frame = cv2.putText(frame, lang_goal, org=(lang_textX, image_size[1] - 35),
                                 fontScale=font_scale, fontFace=font, color=(0, 0, 0),
                                 thickness=font_thickness, lineType=cv2.LINE_AA)
-
-            # reward_org = (image_size[0] - 118, 25)
-            # reward_text = "Score: {}".format(reward)
-            #
-            # frame = cv2.putText(frame, reward_text, org=reward_org,
-            #                     fontScale=0.6, fontFace=font, color=(0, 0, 255),
-            #                     thickness=font_thickness, lineType=cv2.LINE_AA)
 
             video.write(frame)
         video.release()

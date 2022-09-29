@@ -316,8 +316,6 @@ class UniformReplayBuffer(ReplayBuffer):
                 term = self._store[TERMINAL]
                 term[cursor] = kwargs[TERMINAL]
                 self._store[TERMINAL] = term
-                # self._store[TERMINAL][cursor] = kwargs[TERMINAL]
-
                 with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:
                     pickle.dump(kwargs, f)
                 # If first add, then pad for correct wrapping
@@ -328,8 +326,6 @@ class UniformReplayBuffer(ReplayBuffer):
                     item = self._store[name]
                     item[cursor] = data
                     self._store[name] = item
-
-                    # self._store[name][cursor] = data
             with self._add_count.get_lock():
                 self._add_count.value += 1
             self.invalid_range = invalid_range(
@@ -420,7 +416,7 @@ class UniformReplayBuffer(ReplayBuffer):
 
     @property
     def add_count(self):
-        return np.array(self._add_count.value) #self._add_count.copy()
+        return np.array(self._add_count.value)
 
     @add_count.setter
     def add_count(self, count):
@@ -735,7 +731,7 @@ class UniformReplayBuffer(ReplayBuffer):
             batch_arrays = self.unpack_transition(
                 batch_arrays, transition_elements)
 
-        # TODO: make a proper fix for this
+        # TODO(Mohit): proper fix to discard task names
         if 'task' in batch_arrays:
             del batch_arrays['task']
         if 'task_tp1' in batch_arrays:

@@ -6,4 +6,5 @@ timeout-decorator
 pyrender
 omegaconf
 hydra-core
-
+pandas
+opencv-python

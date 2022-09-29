@@ -62,7 +62,6 @@ class PrioritizedReplayBuffer(UniformReplayBuffer):
                 term = self._store[TERMINAL]
                 term[cursor] = kwargs[TERMINAL]
                 self._store[TERMINAL] = term
-                # self._store[TERMINAL][cursor] = kwargs[TERMINAL]
 
                 with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:
                     pickle.dump(kwargs, f)
