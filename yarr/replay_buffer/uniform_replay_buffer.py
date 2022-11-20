@@ -26,6 +26,8 @@ from natsort import natsort
 from yarr.replay_buffer.replay_buffer import ReplayBuffer, ReplayElement
 from yarr.utils.observation_type import ObservationElement
 
+import torch.distributed as dist
+
 # Defines a type describing part of the tuple returned by the replay
 # memory. Each element of the tuple is a tensor of shape [batch, ...] where
 # ... is defined the 'shape' field of ReplayElement. The tensor type is
@@ -100,7 +102,9 @@ class UniformReplayBuffer(ReplayBuffer):
                  observation_elements: List[ObservationElement] = None,
                  extra_replay_elements: List[ReplayElement] = None,
                  save_dir: str = None,
-                 purge_replay_on_shutdown: bool = True
+                 purge_replay_on_shutdown: bool = True,
+                 num_replicas: int = None,
+                 rank: int = None,
                  ):
         """Initializes OutOfGraphReplayBuffer.
 
@@ -127,6 +131,18 @@ class UniformReplayBuffer(ReplayBuffer):
           ValueError: If replay_capacity is too small to hold at least one
             transition.
         """
+        if num_replicas is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            self._num_replicas = dist.get_world_size()
+        if rank is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            self._rank = dist.get_rank()
+        if self._rank >= self._num_replicas or self._rank < 0:
+            raise ValueError(
+                "Invalid rank {}, rank should be in the interval"
+                " [0, {}]".format(self._rank, self._num_replicas - 1))
 
         if observation_elements is None:
             observation_elements = []

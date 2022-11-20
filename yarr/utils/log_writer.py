@@ -30,7 +30,6 @@ class LogWriter(object):
             self._env_csv_file = os.path.join(logdir, env_csv)
             self._train_field_names = None
             self._env_field_names = None
-            self._resumed_from_prev_run = False  # argh... not used anywhere
 
     def add_scalar(self, i, name, value):
         if self._tensorboard_logging:
@@ -123,9 +122,6 @@ class LogWriter(object):
                     print(e)
             self._env_prev_row_data = self._env_row_data
             self._env_row_data = OrderedDict()
-
-    def set_resumed_from_prev_run(self, state):
-        self._resumed_from_prev_run = state
 
     def close(self):
         if self._tensorboard_logging:

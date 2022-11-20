@@ -2,6 +2,7 @@ import numpy as np
 import os
 from os.path import join
 import pickle
+import math
 from yarr.replay_buffer.uniform_replay_buffer import UniformReplayBuffer
 from yarr.replay_buffer.uniform_replay_buffer import invalid_range
 
@@ -59,7 +60,8 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                 self.cursor(), self._replay_capacity, self._timesteps,
                 self._update_horizon)
 
-    def sample_index_batch(self, batch_size):
+    def sample_index_batch(self,
+                           batch_size):
         """Returns a batch of valid indices sampled uniformly.
 
         Args:
@@ -91,16 +93,23 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
 
         # uniform distribution of tasks
         while not found_indicies and attempt_count < 1000:
+            # sample random tasks of batch_size length
             sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
             potential_indices = []
             for task in sampled_tasks:
-                sampled_task_idx = np.random.choice(self._task_idxs[task], 1)[0]
+                # DDP setting where each thread only see a fraction of the data
+                task_data_size = len(self._task_idxs[task])
+                num_samples = math.ceil(task_data_size / self._num_replicas)
+                total_size = num_samples * self._num_replicas
+                task_indices = self._task_idxs[task][self._rank:total_size:self._num_replicas]
+
+                sampled_task_idx = np.random.choice(task_indices, 1)[0]
                 per_task_attempt_count = 0
 
                 # Argh.. this is slow
                 while not self.is_valid_transition(sampled_task_idx) and \
                     per_task_attempt_count < self._max_sample_attempts:
-                    sampled_task_idx = np.random.choice(self._task_idxs[task], 1)[0]
+                    sampled_task_idx = np.random.choice(task_indices, 1)[0]
                     per_task_attempt_count += 1
 
                 if not self.is_valid_transition(sampled_task_idx):
@@ -118,3 +127,41 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                     format(self._max_sample_attempts, len(indices), batch_size))
 
         return indices
+
+    def get_transition_elements(self, batch_size=None):
+        """Returns a 'type signature' for sample_transition_batch.
+
+        Args:
+          batch_size: int, number of transitions returned. If None, the default
+            batch_size will be used.
+        Returns:
+          signature: A namedtuple describing the method's return type signature.
+        """
+        batch_size = self._batch_size if batch_size is None else batch_size
+
+        transition_elements = [
+            ReplayElement(ACTION, (batch_size, self._timesteps) + self._action_shape,
+                          self._action_dtype),
+            ReplayElement(REWARD, (batch_size, self._timesteps) + self._reward_shape,
+                          self._reward_dtype),
+            ReplayElement(TERMINAL, (batch_size, self._timesteps), np.int8),
+            ReplayElement(TIMEOUT, (batch_size, self._timesteps), np.bool),
+            ReplayElement(INDICES, (batch_size, self._timesteps), np.int32),
+        ]
+
+        for element in self._observation_elements:
+            transition_elements.append(ReplayElement(
+                element.name,
+                (batch_size, self._timesteps) + tuple(element.shape),
+                element.type, True))
+            transition_elements.append(ReplayElement(
+                element.name + '_tp1',
+                (batch_size, self._timesteps) + tuple(element.shape),
+                element.type, True))
+
+        for element in self._extra_replay_elements:
+            transition_elements.append(ReplayElement(
+                element.name,
+                (batch_size,) + tuple(element.shape),
+                element.type))
+        return transition_elements
