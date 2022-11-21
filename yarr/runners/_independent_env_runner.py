@@ -238,11 +238,13 @@ class _IndependentEnvRunner(_EnvRunner):
 
                 self._num_eval_episodes_signal.value += 1
 
+                task_name, _ = self._get_task_name()
+                reward = episode_rollout[-1].reward
+                print(f"Evaluating {task_name} | Episode {ep} | Score: {reward}")
+
                 # save recording
                 if rec_cfg.enabled:
-                    reward = episode_rollout[-1].reward
                     success = reward > 0.99
-                    task_name, _ = self._get_task_name()
                     record_file = os.path.join(seed_path, 'videos',
                                                '%s_w%s_s%s_%s.mp4' % (task_name,
                                                                       weight_name,
@@ -267,7 +269,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
             task_score = [s.value for s in summaries
                           if f'eval_envs/return/{eval_task_name}' in s.name][0]
-            print(f"Finished {eval_task_name} | Score: {task_score}")
+            print(f"Finished {eval_task_name} | Final Score: {task_score}")
 
             if self._save_metrics:
                 with writer_lock:
