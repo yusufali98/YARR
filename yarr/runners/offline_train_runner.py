@@ -26,8 +26,6 @@ from yarr.utils.log_writer import LogWriter
 from yarr.utils.stat_accumulator import StatAccumulator
 from yarr.replay_buffer.prioritized_replay_buffer import PrioritizedReplayBuffer
 
-NUM_WEIGHTS_TO_KEEP = 60
-
 
 class OfflineTrainRunner():
 
@@ -38,8 +36,10 @@ class OfflineTrainRunner():
                  stat_accumulator: Union[StatAccumulator, None] = None,
                  iterations: int = int(6e6),
                  logdir: str = '/tmp/yarr/logs',
+                 logging_level: int = logging.INFO,
                  log_freq: int = 10,
                  weightsdir: str = '/tmp/yarr/weights',
+                 num_weights_to_keep: int = 60,
                  save_freq: int = 100,
                  tensorboard_logging: bool = True,
                  csv_logging: bool = False,
@@ -51,8 +51,10 @@ class OfflineTrainRunner():
         self._stat_accumulator = stat_accumulator
         self._iterations = iterations
         self._logdir = logdir
+        self._logging_level = logging_level
         self._log_freq = log_freq
         self._weightsdir = weightsdir
+        self._num_weights_to_keep = num_weights_to_keep
         self._save_freq = save_freq
 
         self._wrapped_buffer = wrapped_replay_buffer
@@ -69,6 +71,7 @@ class OfflineTrainRunner():
         else:
             self._writer = LogWriter(
                 self._logdir, tensorboard_logging, csv_logging)
+
         if weightsdir is None:
             logging.info(
                 "'weightsdir' was None. No weight saving will take place.")
@@ -79,9 +82,10 @@ class OfflineTrainRunner():
         d = os.path.join(self._weightsdir, str(i))
         os.makedirs(d, exist_ok=True)
         self._agent.save_weights(d)
-        # Remove oldest save
+
+        # remove oldest save
         prev_dir = os.path.join(self._weightsdir, str(
-            i - self._save_freq * NUM_WEIGHTS_TO_KEEP))
+            i - self._save_freq * self._num_weights_to_keep))
         if os.path.exists(prev_dir):
             shutil.rmtree(prev_dir)
 
@@ -101,6 +105,7 @@ class OfflineTrainRunner():
             return starting_epoch
 
     def start(self):
+        logging.getLogger().setLevel(self._logging_level)
         self._agent = copy.deepcopy(self._agent)
         self._agent.build(training=True, device=self._train_device)
 
@@ -138,7 +143,6 @@ class OfflineTrainRunner():
 
             if self._rank == 0:
                 if log_iteration and self._writer is not None:
-                    # agent summaries
                     agent_summaries = self._agent.update_summaries()
                     self._writer.add_summaries(i, agent_summaries)
 
@@ -149,7 +153,7 @@ class OfflineTrainRunner():
                         i, 'monitoring/cpu_percent',
                         process.cpu_percent(interval=None) / num_cpu)
 
-                    print(f"Train Step {i} | Loss: {loss:0.5f} | Sample time: {sample_time:0.6f} | Step time: {step_time:0.4f}.")
+                    logging.info(f"Train Step {i} | Loss: {loss:0.5f} | Sample time: {sample_time:0.6f} | Step time: {step_time:0.4f}.")
 
                 self._writer.end_iteration()
 
@@ -158,6 +162,6 @@ class OfflineTrainRunner():
 
         if self._rank == 0 and self._writer is not None:
             self._writer.close()
+            logging.info('Stopping envs ...')
 
-        logging.info('Stopping envs ...')
         self._wrapped_buffer.shutdown()

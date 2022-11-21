@@ -9,6 +9,7 @@ from yarr.replay_buffer.replay_buffer import ReplayBuffer
 from yarr.runners._independent_env_runner import _IndependentEnvRunner
 from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.stat_accumulator import StatAccumulator, SimpleAccumulator
+from yarr.agents.agent import Summary
 from helpers.custom_rlbench_env import CustomRLBenchEnv, CustomMultiTaskRLBenchEnv
 
 from yarr.runners.env_runner import EnvRunner
@@ -42,6 +43,33 @@ class IndependentEnvRunner(EnvRunner):
                             episode_length, eval_env, eval_replay_buffer, stat_accumulator,
                             rollout_generator, weightsdir, logdir, max_fails, num_eval_runs,
                             env_device, multi_task)
+
+    def summaries(self) -> List[Summary]:
+        summaries = []
+        if self._stat_accumulator is not None:
+            summaries.extend(self._stat_accumulator.pop())
+        self._new_transitions = {'train_envs': 0, 'eval_envs': 0}
+        summaries.extend(self._agent_summaries)
+
+        # add current task_name to eval summaries .... argh this should be inside a helper function
+        if hasattr(self._eval_env, '_task_class'):
+            eval_task_name = change_case(self._eval_env._task_class.__name__)
+        elif hasattr(self._eval_env, '_task_classes'):
+            if self._current_task_id != -1:
+                task_id = (self._current_task_id) % len(self._eval_env._task_classes)
+                eval_task_name = change_case(self._eval_env._task_classes[task_id].__name__)
+            else:
+                eval_task_name = ''
+        else:
+            raise Exception('Neither task_class nor task_classes found in eval env')
+
+        # multi-task summaries
+        if eval_task_name and self._multi_task:
+            for s in summaries:
+                if 'eval' in s.name:
+                    s.name = '%s/%s' % (s.name, eval_task_name)
+
+        return summaries
 
     # serialized evaluator for individual tasks
     def start(self, weight,

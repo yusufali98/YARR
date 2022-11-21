@@ -6,6 +6,9 @@ import math
 from yarr.replay_buffer.uniform_replay_buffer import UniformReplayBuffer
 from yarr.replay_buffer.uniform_replay_buffer import invalid_range
 
+from yarr.replay_buffer.replay_buffer import ReplayBuffer, ReplayElement
+from yarr.utils.observation_type import ObservationElement
+
 ACTION = 'action'
 REWARD = 'reward'
 TERMINAL = 'terminal'

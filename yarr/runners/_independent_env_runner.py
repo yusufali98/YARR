@@ -86,12 +86,12 @@ class _IndependentEnvRunner(_EnvRunner):
                             # rare case when agent hasn't finished writing.
                             time.sleep(1)
                             self._agent.load_weights(d)
-                        print('Agent %s: Loaded weights: %s' % (self._name, d))
+                        logging.info('Agent %s: Loaded weights: %s' % (self._name, d))
                         self._new_weights = True
                     else:
                         self._new_weights = False
                     break
-            print('Waiting for weights to become available.')
+            logging.info('Waiting for weights to become available.')
             time.sleep(1)
 
     def _get_task_name(self):
@@ -162,7 +162,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
         # one weight for all tasks (used for validation)
         if type(weight) == int:
-            print('Evaluating weight %s' % weight)
+            logging.info('Evaluating weight %s' % weight)
             weight_path = os.path.join(self._weightsdir, str(weight))
             seed_path = self._weightsdir.replace('/weights', '')
             self._agent.load_weights(weight_path)
@@ -184,7 +184,7 @@ class _IndependentEnvRunner(_EnvRunner):
                 seed_path = self._weightsdir.replace('/weights', '')
                 self._agent.load_weights(weight_path)
                 weight_name = str(task_weight)
-                print('Evaluating weight %s for %s' % (weight_name, task_name))
+                logging.info('Evaluating weight %s for %s' % (weight_name, task_name))
 
             # evaluate on N tasks * M episodes per task = total eval episodes
             for ep in range(self._eval_episodes):
@@ -257,11 +257,6 @@ class _IndependentEnvRunner(_EnvRunner):
             # report summaries
             summaries = []
             summaries.extend(stats_accumulator.pop())
-            for key, value in new_transitions.items():
-                summaries.append(ScalarSummary('%s/new_transitions' % key, value))
-            for key, value in total_transitions.items():
-                summaries.append(ScalarSummary('%s/total_transitions' % key, value))
-            summaries.extend(self.agent_summaries)
 
             eval_task_name, multi_task = self._get_task_name()
 
@@ -269,7 +264,10 @@ class _IndependentEnvRunner(_EnvRunner):
                 for s in summaries:
                     if 'eval' in s.name:
                         s.name = '%s/%s' % (s.name, eval_task_name)
-            print("Finished %s." % eval_task_name)
+
+            task_score = [s.value for s in summaries
+                          if f'eval_envs/return/{eval_task_name}' in s.name][0]
+            print(f"Finished {eval_task_name} | Score: {task_score}")
 
             if self._save_metrics:
                 with writer_lock:
