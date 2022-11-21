@@ -32,7 +32,7 @@ class EnvRunner(object):
                  rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
-                 eval_from_seed: int,
+                 eval_from_eps_number: int,
                  episode_length: int,
                  eval_env: Union[Env, None] = None,
                  eval_replay_buffer: Union[ReplayBuffer, List[ReplayBuffer], None] = None,
@@ -59,7 +59,7 @@ class EnvRunner(object):
         self._eval_episodes = eval_episodes
         self._num_eval_runs = num_eval_runs
         self._training_iterations = training_iterations
-        self._eval_from_seed = eval_from_seed
+        self._eval_from_eps_number = eval_from_eps_number
         self._episode_length = episode_length
         self._stat_accumulator = stat_accumulator
         self._rollout_generator = (
@@ -152,7 +152,7 @@ class EnvRunner(object):
         self._internal_env_runner = _EnvRunner(
             self._train_env, self._eval_env, self._agent, self._timesteps, self._train_envs,
             self._eval_envs, self._rollout_episodes, self._eval_episodes,
-            self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
+            self._training_iterations, self._eval_from_eps_number, self._episode_length, self._kill_signal,
             self._step_signal, self._num_eval_episodes_signal,
             self._eval_epochs_signal, self._eval_report_signal,
             self.log_freq, self._rollout_generator, save_load_lock,

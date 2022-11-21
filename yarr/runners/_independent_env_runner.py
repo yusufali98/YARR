@@ -37,7 +37,7 @@ class _IndependentEnvRunner(_EnvRunner):
                  rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
-                 eval_from_seed: int,
+                 eval_from_eps_number: int,
                  episode_length: int,
                  kill_signal: Any,
                  step_signal: Any,
@@ -58,7 +58,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
             super().__init__(train_env, eval_env, agent, timesteps,
                              train_envs, eval_envs, rollout_episodes, eval_episodes,
-                             training_iterations, eval_from_seed, episode_length,
+                             training_iterations, eval_from_eps_number, episode_length,
                              kill_signal, step_signal, num_eval_episodes_signal,
                              eval_epochs_signal, eval_report_signal, log_freq,
                              rollout_generator, save_load_lock, current_replay_ratio,
@@ -188,7 +188,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
             # evaluate on N tasks * M episodes per task = total eval episodes
             for ep in range(self._eval_episodes):
-                eval_demo_seed = ep + self._eval_from_seed
+                eval_demo_seed = ep + self._eval_from_eps_number
                 logging.info('%s: Starting episode %d, seed %d.' % (name, ep, eval_demo_seed))
 
                 # the current task gets reset after every M episodes

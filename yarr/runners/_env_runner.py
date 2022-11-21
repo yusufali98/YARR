@@ -41,7 +41,7 @@ class _EnvRunner(object):
                  rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
-                 eval_from_seed: int,
+                 eval_from_eps_number: int,
                  episode_length: int,
                  kill_signal: Any,
                  step_signal: Any,
@@ -68,7 +68,7 @@ class _EnvRunner(object):
         self._eval_episodes = eval_episodes
         self._training_iterations = training_iterations
         self._num_eval_runs = num_eval_runs
-        self._eval_from_seed = eval_from_seed
+        self._eval_from_eps_number = eval_from_eps_number
         self._episode_length = episode_length
         self._rollout_generator = rollout_generator
         self._weightsdir = weightsdir

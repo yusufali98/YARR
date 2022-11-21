@@ -26,7 +26,7 @@ class IndependentEnvRunner(EnvRunner):
                  rollout_episodes: int,
                  eval_episodes: int,
                  training_iterations: int,
-                 eval_from_seed: int,
+                 eval_from_eps_number: int,
                  episode_length: int,
                  eval_env: Union[Env, None] = None,
                  eval_replay_buffer: Union[ReplayBuffer, List[ReplayBuffer], None] = None,
@@ -39,7 +39,7 @@ class IndependentEnvRunner(EnvRunner):
                  env_device: torch.device = None,
                  multi_task: bool = False):
             super().__init__(train_env, agent, train_replay_buffer, num_train_envs, num_eval_envs,
-                            rollout_episodes, eval_episodes, training_iterations, eval_from_seed,
+                            rollout_episodes, eval_episodes, training_iterations, eval_from_eps_number,
                             episode_length, eval_env, eval_replay_buffer, stat_accumulator,
                             rollout_generator, weightsdir, logdir, max_fails, num_eval_runs,
                             env_device, multi_task)
@@ -106,7 +106,7 @@ class IndependentEnvRunner(EnvRunner):
         self._internal_env_runner = _IndependentEnvRunner(
             self._train_env, eval_env, self._agent, self._timesteps, self._train_envs,
             self._eval_envs, self._rollout_episodes, self._eval_episodes,
-            self._training_iterations, self._eval_from_seed, self._episode_length, self._kill_signal,
+            self._training_iterations, self._eval_from_eps_number, self._episode_length, self._kill_signal,
             self._step_signal, self._num_eval_episodes_signal,
             self._eval_epochs_signal, self._eval_report_signal,
             self.log_freq, self._rollout_generator, None,
