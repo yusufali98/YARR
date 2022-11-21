@@ -184,7 +184,7 @@ class _IndependentEnvRunner(_EnvRunner):
                 seed_path = self._weightsdir.replace('/weights', '')
                 self._agent.load_weights(weight_path)
                 weight_name = str(task_weight)
-                logging.info('Evaluating weight %s for %s' % (weight_name, task_name))
+                print('Evaluating weight %s for %s' % (weight_name, task_name))
 
             # evaluate on N tasks * M episodes per task = total eval episodes
             for ep in range(self._eval_episodes):
