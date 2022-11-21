@@ -6,7 +6,6 @@ import signal
 import sys
 import threading
 import time
-# from multiprocessing import Lock
 from typing import Optional, List
 from typing import Union
 
@@ -118,7 +117,8 @@ class OfflineTrainRunner():
                 resume_iteration = existing_weights[-1]
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
-                print(f"Resuming training from iteration {resume_iteration} ...")
+                if self._rank == 0:
+                    logging.info(f"Resuming training from iteration {resume_iteration} ...")
 
         dataset = self._wrapped_buffer.dataset()
         data_iter = iter(dataset)

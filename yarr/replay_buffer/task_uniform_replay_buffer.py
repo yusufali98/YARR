@@ -100,7 +100,7 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
             sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
             potential_indices = []
             for task in sampled_tasks:
-                # DDP setting where each thread only see a fraction of the data
+                # DDP setting where each GPU only sees a fraction of the data
                 task_data_size = len(self._task_idxs[task])
                 num_samples = math.ceil(task_data_size / self._num_replicas)
                 total_size = num_samples * self._num_replicas
