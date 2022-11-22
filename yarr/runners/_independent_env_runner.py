@@ -268,8 +268,11 @@ class _IndependentEnvRunner(_EnvRunner):
                     if 'eval' in s.name:
                         s.name = '%s/%s' % (s.name, eval_task_name)
 
-            task_score = [s.value for s in summaries
-                          if f'eval_envs/return/{eval_task_name}' in s.name][0]
+            if multi_task:
+                task_score = [s.value for s in summaries if f'eval_envs/return/{eval_task_name}' in s.name][0]
+            else:
+                task_score = [s.value for s in summaries if f'eval_envs/return' in s.name][0]
+
             print(f"Finished {eval_task_name} | Final Score: {task_score}\n")
 
             if self._save_metrics:
