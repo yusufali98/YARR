@@ -9,7 +9,6 @@ import time
 from typing import Optional, List
 from typing import Union
 
-import pytorch_lightning as pl
 from omegaconf import DictConfig
 import gc
 import numpy as np
