@@ -97,7 +97,7 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
         # uniform distribution of tasks
         while not found_indicies and attempt_count < 1000:
             # sample random tasks of batch_size length
-r            sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
+            sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
             potential_indices = []
             for task in sampled_tasks:
                 # DDP setting where each GPU only sees a fraction of the data
