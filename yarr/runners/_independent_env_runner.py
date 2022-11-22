@@ -240,7 +240,8 @@ class _IndependentEnvRunner(_EnvRunner):
 
                 task_name, _ = self._get_task_name()
                 reward = episode_rollout[-1].reward
-                print(f"Evaluating {task_name} | Episode {ep} | Score: {reward}")
+                lang_goal = env._lang_goal
+                print(f"Evaluating {task_name} | Episode {ep} | Score: {reward} | Lang Goal: {lang_goal}")
 
                 # save recording
                 if rec_cfg.enabled:
