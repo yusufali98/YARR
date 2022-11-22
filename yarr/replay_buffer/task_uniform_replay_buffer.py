@@ -97,10 +97,11 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
         # uniform distribution of tasks
         while not found_indicies and attempt_count < 1000:
             # sample random tasks of batch_size length
-            sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
+r            sampled_tasks = list(np.random.choice(tasks, batch_size, replace=(batch_size > len(tasks))))
             potential_indices = []
             for task in sampled_tasks:
                 # DDP setting where each GPU only sees a fraction of the data
+                # reference: https://github.com/pytorch/pytorch/blob/master/torch/utils/data/distributed.py
                 task_data_size = len(self._task_idxs[task])
                 num_samples = math.ceil(task_data_size / self._num_replicas)
                 total_size = num_samples * self._num_replicas

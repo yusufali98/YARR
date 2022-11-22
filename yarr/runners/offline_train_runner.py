@@ -153,7 +153,7 @@ class OfflineTrainRunner():
                         i, 'monitoring/cpu_percent',
                         process.cpu_percent(interval=None) / num_cpu)
 
-                    logging.info(f"Train Step {i} | Loss: {loss:0.5f} | Sample time: {sample_time:0.6f} | Step time: {step_time:0.4f}.")
+                    logging.info(f"Train Step {i:06d} | Loss: {loss:0.5f} | Sample time: {sample_time:0.6f} | Step time: {step_time:0.4f}.")
 
                 self._writer.end_iteration()
 

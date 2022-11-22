@@ -270,7 +270,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
             task_score = [s.value for s in summaries
                           if f'eval_envs/return/{eval_task_name}' in s.name][0]
-            print(f"Finished {eval_task_name} | Final Score: {task_score}")
+            print(f"Finished {eval_task_name} | Final Score: {task_score}\n")
 
             if self._save_metrics:
                 with writer_lock:
