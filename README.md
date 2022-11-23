@@ -24,5 +24,5 @@ This is my (Mohit Shridhar) fork of YARR. Honestly, I don't understand what exac
 Ensure you have [PyTorch installed](https://pytorch.org/get-started/locally/).
 Then simply run:
 ```bash
-pip install .
+python setup.py develop
 ```
