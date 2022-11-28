@@ -163,3 +163,4 @@ class OfflineTrainRunner():
             self._writer.close()
             logging.info('Stopping envs ...')
 
+        self._wrapped_buffer.replay_buffer.shutdown()
