@@ -67,6 +67,8 @@ class PyTorchReplayBuffer(WrappedReplayBuffer):
         self._sample_mode = sample_mode
         self._sample_distribution_mode = sample_distribution_mode
 
+        print("PyTorch Replay Buffer Sampling Mode: ", self._sample_mode)
+
     def dataset(self) -> DataLoader:
         d = PyTorchIterableReplayDataset(self._replay_buffer, self._sample_mode, self._sample_distribution_mode)
 
