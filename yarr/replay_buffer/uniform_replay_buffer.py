@@ -305,14 +305,14 @@ class UniformReplayBuffer(ReplayBuffer):
 
     def recover_from_disk(self, task, task_replay_storage_folder):
 
-        print("task folder: ", task_replay_storage_folder)
+        # print("task folder: ", task_replay_storage_folder)
         sys.stdout.flush()
 
         if os.path.exists(os.path.join(task_replay_storage_folder, 'replay_info.npy')):
             with open(os.path.join(task_replay_storage_folder, 'replay_info.npy'), 'rb') as fp:
                 replay_info = np.load(fp)
             
-            print("opened task replay info file: ", os.path.join(task_replay_storage_folder, 'replay_info.npy'))
+            # print("opened task replay info file: ", os.path.join(task_replay_storage_folder, 'replay_info.npy'))
             sys.stdout.flush()
 
         else:
@@ -337,14 +337,13 @@ class UniformReplayBuffer(ReplayBuffer):
 
         task_idx = self._task_index[task]
 
-        print("starting new task recovery....")
+        # print("starting new task recovery....")
 
         for i in range(len(replay_info)):
             cursor = self.cursor()
 
-            if i % 2000 == 0:
-                print("Current i: ", i, "       Cursor: ", cursor)
-
+            # if i % 2000 == 0:
+                # print("Current i: ", i, "       Cursor: ", cursor)
             self._store[TERMINAL][cursor] = replay_info[i]
 
             self._index_mapping[cursor, 0] = task_idx
@@ -360,11 +359,11 @@ class UniformReplayBuffer(ReplayBuffer):
                 self.cursor(), self._replay_capacity, self._timesteps,
                 self._update_horizon)
         
-        print("self invalid range: ", self.invalid_range)
-        print("self task names: ", self._task_names)
-        print("self task replay storage folder: ", self._task_replay_storage_folders)
-        print("self task index: ", self._task_index)
-        sys.stdout.flush()
+        # print("self invalid range: ", self.invalid_range)
+        # print("self task names: ", self._task_names)
+        # print("self task replay storage folder: ", self._task_replay_storage_folders)
+        # print("self task index: ", self._task_index)
+        # sys.stdout.flush()
 
     def add_final(self, task, task_replay_storage_folder, **kwargs):
         """Adds a transition to the replay memory.
@@ -932,7 +931,7 @@ class UniformReplayBuffer(ReplayBuffer):
                                         store[element.name],
                                         state_index, terminal_stack)
                                 except:
-                                    print("Error element name: ", element.name, flush=True)
+                                    # print("Error element name: ", element.name, flush=True)
                                     sys.stdout.flush()
 
                 # print("********************************************** \n Exiting sample transition for loop... \n **************************************************")
@@ -1023,7 +1022,7 @@ class UniformReplayBuffer(ReplayBuffer):
         get the number of indices that can be sampled
         '''
 
-        print("********************************** self.cursor(): ", self.cursor())
+        # print("********************************** self.cursor(): ", self.cursor())
 
         if self.is_full():
             # add_count >= self._replay_capacity > self._stack_size

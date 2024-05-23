@@ -56,6 +56,31 @@ TERMINAL = 'terminal'
 TIMEOUT = 'timeout'
 INDICES = 'indices'
 
+import threading
+
+class ReadWriteLock:
+    def __init__(self):
+        self._read_ready = threading.Condition(threading.Lock())
+        self._readers = 0
+
+    def acquire_read(self):
+        with self._read_ready:
+            self._readers += 1
+
+    def release_read(self):
+        with self._read_ready:
+            self._readers -= 1
+            if self._readers == 0:
+                self._read_ready.notify_all()
+
+    def acquire_write(self):
+        self._read_ready.acquire()
+        while self._readers > 0:
+            self._read_ready.wait()
+
+    def release_write(self):
+        self._read_ready.release()
+
 
 def invalid_range(cursor, replay_capacity, stack_size, update_horizon):
     """Returns a array with the indices of cursor-related invalid transitions.
@@ -102,6 +127,44 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
         transitions
     """
 
+    # def __init__(self,
+    #             batch_size: int = 32,
+    #             timesteps: int = 1,
+    #             replay_capacity: int = int(1e6),
+    #             update_horizon: int = 1,
+    #             gamma: float = 0.99,
+    #             max_sample_attempts: int = 10000,
+    #             action_shape: tuple = (),
+    #             action_dtype: Type[np.dtype] = np.float32,
+    #             reward_shape: tuple = (),
+    #             reward_dtype: Type[np.dtype] = np.float32,
+    #             observation_elements: List[ObservationElement] = None,
+    #             extra_replay_elements: List[ReplayElement] = None,
+    #             disk_saving: bool = False,
+    #             purge_replay_on_shutdown: bool = True,
+    #             optimized_training=False,
+    #             ):
+
+    #     super(UniformReplayBufferOptimized, self).__init__(
+    #         batch_size=batch_size,
+    #         timesteps=timesteps,
+    #         replay_capacity=replay_capacity,
+    #         update_horizon=update_horizon,
+    #         gamma=gamma,
+    #         max_sample_attempts=max_sample_attempts,
+    #         action_shape=action_shape,
+    #         action_dtype=action_dtype,
+    #         reward_shape=reward_shape,
+    #         reward_dtype=reward_dtype,
+    #         observation_elements=observation_elements,
+    #         extra_replay_elements=extra_replay_elements,
+    #         disk_saving=disk_saving,
+    #         purge_replay_on_shutdown=purge_replay_on_shutdown,
+    #         optimized_training=optimized_training,
+    #     )
+
+    #     self._rw_lock = ReadWriteLock()
+
     def _get_from_disk(self, start_index, end_index):
         """Returns the range of array at the index handling wraparound if necessary.
 
@@ -114,6 +177,9 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
         Returns:
           np.array, with shape [end_index - start_index, array.shape[1:]].
         """
+
+        overall_time = time.time()
+
         assert end_index > start_index, 'end_index must be larger than start_index'
         assert end_index >= 0
         assert start_index < self._replay_capacity
@@ -162,6 +228,10 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
                     d = pickle.load(f)
                     for k, v in d.items():
                         store[k][idx] = v
+        
+        overall_time = time.time() - overall_time
+        print(f"Loading function in {overall_time:.4f} seconds")
+        sys.stdout.flush()
         return store
 
     def sample_transition_batch(self, batch_size=None, indices=None,
@@ -200,10 +270,17 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
 
         if batch_size is None:
             batch_size = self._batch_size
+
+        # self._rw_lock.acquire_read()
+
         with self._lock:
+            start_time = time.time()
+            
             if indices is None:
                 indices = self.sample_index_batch(batch_size, distribution_mode)
             assert len(indices) == batch_size
+            print(f"Index sampling time: {time.time() - start_time} seconds")
+            sys.stdout.flush()
 
             # print("********************************************** \n Generated indices... : **************************************************", indices)
 
@@ -241,9 +318,18 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
                 # print("********************************************** \n Loading from disk... \n **************************************************")
 
                 if self._disk_saving:
+                    disk_start_time = time.time()
+                    
+                    # self._rw_lock.release_read()
+
                     store = self._get_from_disk(
                         state_index - (self._timesteps - 1),
                         next_state_index + 1)
+
+                    # self._rw_lock.acquire_read()
+
+                print(f"Disk loading time: {time.time() - disk_start_time} seconds")
+                sys.stdout.flush()
 
                 # print("********************************************** \n Loaded from disk!! \n **************************************************")
 
@@ -262,6 +348,9 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
 
                 # print("********************************************** \n Exiting sample transition for loop... \n **************************************************")
 
+        # finally:
+        #     self._rw_lock.release_read()
+        
         if pack_in_dict:
             batch_arrays = self.unpack_transition(
                 batch_arrays, transition_elements)
@@ -275,5 +364,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
         batch_arrays['tasks'] = task_name_arrays
 
         # print("********************************************** \n Returned Batch of Data ! \n **************************************************")
+        print(f"Total sample transition batch time: {time.time() - start_time} seconds")
+        sys.stdout.flush()
 
         return batch_arrays
