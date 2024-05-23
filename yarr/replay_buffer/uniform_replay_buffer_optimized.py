@@ -131,9 +131,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
                 task_index = self._index_mapping[i, 1]
 
                 # NOTE: We need to skip loading the missing *.replay files as they were not saved during optimised replay bufffer generation
-                if self._optimized_training:
-                    # if self.is_valid_transition(i):
-                    # try:
+                try:
                     with open(join(task_replay_storage_folder, '%d.replay' % task_index), 'rb') as f:
                         # print("File name: ", join(task_replay_storage_folder, '%d.replay' % task_index))
                         d = pickle.load(f)
@@ -141,12 +139,13 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
                             # print("#########: ", k, "       ", i)
                             store[k][i] = v # NOTE: potential bug here, should % self._replay_capacity
                     store['replay_file_name'][i] = str(join(task_replay_storage_folder, '%d.replay' % task_index))
-                        
-                        # print("Cur i value: ", i, "     start idx: ", start_index, "     end_idx: ", end_index)
-                        # print("Failed to load: ", join(task_replay_storage_folder, '%d.replay' % task_index))
-                        # sys.stdout.flush()
-                else:
-                    with open(join(task_replay_storage_folder, '%d.replay' % task_index), 'rb') as f:
+                except:
+                    # print("Cur i value: ", i, "     start idx: ", start_index, "     end_idx: ", end_index)
+                    print("Failed to load: ", join(task_replay_storage_folder, '%d.replay' % task_index))
+                    sys.stdout.flush()
+                    
+                    # since we encountered a corrupted replay file, we jsut load 0.replay corresponding to that task
+                    with open(join(task_replay_storage_folder, '0.replay'), 'rb') as f:
                         # print("File name: ", join(task_replay_storage_folder, '%d.replay' % task_index))
                         d = pickle.load(f)
                         for k, v in d.items():
@@ -248,65 +247,18 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
 
                 # print("********************************************** \n Loaded from disk!! \n **************************************************")
 
-                if not self._optimized_training:
+                terminal_stack = self.get_terminal_stack(state_index)
 
-                    trajectory_discount_vector = (
-                        self._cumulative_discount_vector[:trajectory_length])
-                
-                    trajectory_rewards = self.get_range(store['reward'],
-                                                        state_index,
-                                                        next_state_index)
-
-                    terminal_stack = self.get_terminal_stack(state_index)
-                    terminal_stack_tp1 = self.get_terminal_stack(
-                        next_state_index % self._replay_capacity)
-
-                    # Fill the contents of each array in the sampled batch.
-                    assert len(transition_elements) == len(batch_arrays)
-                    for element_array, element in zip(batch_arrays,
-                                                    transition_elements):
-                        if element.is_observation:
-                            if element.name.endswith('tp1'):
-                                element_array[
-                                    batch_element] = self._get_element_stack(
-                                    store[element.name[:-4]],
-                                    next_state_index % self._replay_capacity,
-                                    terminal_stack_tp1)
-                            else:
-                                element_array[
-                                    batch_element] = self._get_element_stack(
-                                    store[element.name],
-                                    state_index, terminal_stack)
-                        elif element.name == REWARD:
-                            # compute discounted sum of rewards in the trajectory.
-                            element_array[batch_element] = np.sum(
-                                trajectory_discount_vector * trajectory_rewards,
-                                axis=0)
-                        elif element.name == TERMINAL:
-                            element_array[batch_element] = is_terminal_transition
-                        elif element.name == INDICES:
-                            element_array[batch_element] = state_index
-                        elif element.name in store.keys():
-                            try:
-                                element_array[batch_element] = (
-                                    store[element.name][state_index])
-                            except:
-                                import IPython
-                                IPython.embed()
-                
-                else:
-                    terminal_stack = self.get_terminal_stack(state_index)
-
-                    for element_array, element in zip(batch_arrays,
-                                                    transition_elements):
-                        if element.is_observation:
-                            if element.name.endswith('tp1'):
-                                continue
-                            else:
-                                element_array[
-                                    batch_element] = self._get_element_stack(
-                                    store[element.name],
-                                    state_index, terminal_stack)
+                for element_array, element in zip(batch_arrays,
+                                                transition_elements):
+                    if element.is_observation:
+                        if element.name.endswith('tp1'):
+                            continue
+                        else:
+                            element_array[
+                                batch_element] = self._get_element_stack(
+                                store[element.name],
+                                state_index, terminal_stack)
 
                 # print("********************************************** \n Exiting sample transition for loop... \n **************************************************")
 
