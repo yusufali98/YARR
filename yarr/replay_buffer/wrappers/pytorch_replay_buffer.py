@@ -43,7 +43,7 @@ class PyTorchIterableReplayDataset(IterableDataset):
             start_time = time.time()
             if self._sample_mode == 'random':
                 yield self._replay_buffer.sample_transition_batch(pack_in_dict=True, distribution_mode = self._sample_distribution_mode)
-                print(f"Random Batch generation time: {time.time() - start_time} seconds")
+                # print(f"Random Batch generation time: {time.time() - start_time} seconds")
                 sys.stdout.flush()
             elif self._sample_mode == 'enumerate':
                 yield self._replay_buffer.enumerate_next_transition_batch(pack_in_dict=True)
@@ -116,8 +116,8 @@ class PyTorchReplayBuffer(WrappedReplayBuffer):
     def dataset(self) -> DataLoader:
         start_time = time.time()
 
-        # d = PyTorchIterableReplayDataset(self._replay_buffer, self._sample_mode, self._sample_distribution_mode)
-        d = PyTorchStaticReplayDataset(self._replay_buffer)
+        d = PyTorchIterableReplayDataset(self._replay_buffer, self._sample_mode, self._sample_distribution_mode)
+        # d = PyTorchStaticReplayDataset(self._replay_buffer)
 
         print(f"Internal IterableDataset creation time: {time.time() - start_time} seconds")
         sys.stdout.flush()

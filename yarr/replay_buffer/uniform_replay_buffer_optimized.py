@@ -230,7 +230,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
                         store[k][idx] = v
         
         overall_time = time.time() - overall_time
-        print(f"Loading function in {overall_time:.4f} seconds")
+        # print(f"Loading function in {overall_time:.4f} seconds")
         sys.stdout.flush()
         return store
 
@@ -279,7 +279,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
             if indices is None:
                 indices = self.sample_index_batch(batch_size, distribution_mode)
             assert len(indices) == batch_size
-            print(f"Index sampling time: {time.time() - start_time} seconds")
+            # print(f"Index sampling time: {time.time() - start_time} seconds")
             sys.stdout.flush()
 
             # print("********************************************** \n Generated indices... : **************************************************", indices)
@@ -328,7 +328,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
 
                     # self._rw_lock.acquire_read()
 
-                print(f"Disk loading time: {time.time() - disk_start_time} seconds")
+                # print(f"Disk loading time: {time.time() - disk_start_time} seconds")
                 sys.stdout.flush()
 
                 # print("********************************************** \n Loaded from disk!! \n **************************************************")
@@ -364,7 +364,7 @@ class UniformReplayBufferOptimized(UniformReplayBuffer):
         batch_arrays['tasks'] = task_name_arrays
 
         # print("********************************************** \n Returned Batch of Data ! \n **************************************************")
-        print(f"Total sample transition batch time: {time.time() - start_time} seconds")
+        # print(f"Total sample transition batch time: {time.time() - start_time} seconds")
         sys.stdout.flush()
 
         return batch_arrays
